@@ -22,8 +22,6 @@ build/
 .env.local
 
 # Data
-*.csv
-*.json
 *.log
 data/raw/*
 !data/raw/.gitkeep
@@ -36,6 +34,21 @@ outputs/*
 logs/*
 !logs/.gitkeep
 
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Test files (keep test directory structure but ignore generated files)
+pathway_pipeline/test/*.csv
+pathway_pipeline/test/gps_stream.csv
+pathway_pipeline/test/processed_output.csv

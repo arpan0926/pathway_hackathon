@@ -1,0 +1,18 @@
+{
+  "shipments": [
+    {
+      "id": "SH001",
+      "origin": "Mumbai",
+      "destination": "Delhi",
+      "status": "in_transit",
+      "vehicle_id": "VH001"
+    },
+    {
+      "id": "SH002",
+      "origin": "Bangalore",
+      "destination": "Chennai",
+      "status": "in_transit",
+      "vehicle_id": "VH002"
+    }
+  ]
+}
