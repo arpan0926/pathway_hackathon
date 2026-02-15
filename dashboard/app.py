@@ -127,6 +127,7 @@ def fetch_model_predictions(df):
             return ""
         
         reasons = []
+<<<<<<< HEAD
         # Handle None values safely
         avg_speed = row.get('avg_speed') or 60.0
         temperature = row.get('temperature') or -18.5
@@ -136,6 +137,13 @@ def fetch_model_predictions(df):
         if temperature > -5:
             reasons.append("Mandatory halt required for cold-chain unit inspection.")
         if row['alert_level'] == 'critical' and avg_speed >= 50:
+=======
+        if row['avg_speed'] < 50:
+            reasons.append("Heavy traffic congestion or roadwork detected.")
+        if row['temperature'] > -5:
+            reasons.append("Mandatory halt required for cold-chain unit inspection.")
+        if row['alert_level'] == 'critical' and row['avg_speed'] >= 50:
+>>>>>>> 4df3918a46fbb2b3630051c4003cf86120309288
             reasons.append("Unexpected route deviation (+14 km) detected.")
             
         return " ".join(reasons) if reasons else "Minor weather disruptions."

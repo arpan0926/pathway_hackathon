@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ai
+      POSTGRES_USER: ai
+      POSTGRES_PASSWORD: ai
+    ports:
+      - "5532:5432"
+    command: 
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  debezium:
+    image: debezium/connect:2.4
+    depends_on:
+      - kafka
+      - postgres
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: configs
+      OFFSET_STORAGE_TOPIC: offsets
+      STATUS_STORAGE_TOPIC: statuses
+
+  pathway:
+    build: .
+    container_name: pathway-pipeline
+    depends_on:
+      - kafka
+      - debezium
+    command: ["python", "pipeline.py"]
+
+  rag-bot:
+    build: .
+    container_name: rag-bot
+    depends_on:
+      - kafka
+      - debezium
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    stdin_open: true
+    tty: true
+    command: ["python", "rag_bot.py"]
