@@ -1,6 +1,7 @@
 import time
 import random
 import psycopg2
+import os
 from datetime import datetime
 import numpy as np
 
@@ -113,32 +114,29 @@ def run_realistic_simulation(shipment_id, origin, destination, vehicle_id):
             break
         
         lat, lon, speed = result
-        load_status = "Loaded" if speed > 0 else "Stopped"
+        load_status = "LOADED" if speed > 0 else "PARTIAL"
         
         # Insert to database
-        insert_telemetry(shipment_id, lat, lon, speed, load_status)
+        insert_telemetry(shipment_id, vehicle_id, lat, lon, speed, load_status)
         
         time.sleep(2)  # Update every 2 seconds
     
     print(f"✅ {shipment_id} completed!")
 
 
-def insert_telemetry(shipment_id, lat, lon, speed, load_status):
+def insert_telemetry(shipment_id, vehicle_id, lat, lon, speed, load_status):
     """Insert GPS data into PostgreSQL"""
     try:
-        conn = psycopg2.connect(
-            host="localhost",
-            port=5532,
-            database="ai",
-            user="ai",
-            password="ai"
-        )
+        # Use environment variable for database connection
+        db_url = os.getenv("DATABASE_URL", "postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db")
+        
+        conn = psycopg2.connect(db_url)
         cur = conn.cursor()
         
         cur.execute("""
-            INSERT INTO telemetry (shipment_id, ts, lat, lon, speed_kmph, load_status)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (shipment_id, datetime.now(), lat, lon, speed, load_status))
+            INSERT INTO telemetry (shipment_id, vehicle_id, ts, lat, lon, speed_kmph, load_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (shipment_id, vehicle_id, datetime.now(), lat, lon, speed, load_status))
         
         conn.commit()
         conn.close()
@@ -151,4 +149,12 @@ def insert_telemetry(shipment_id, lat, lon, speed, load_status):
 
 
 if __name__ == "__main__":
-    run_realistic_simulation("SHP001", "Mumbai", "Delhi", "TRK-22")
+    # Run both shipments in parallel (simplified - run one at a time for demo)
+    print("\n🚀 Starting GPS Simulator for all shipments...")
+    print("=" * 60)
+    
+    # Simulate SH001: Mumbai → Delhi
+    run_realistic_simulation("SH001", "Mumbai", "Delhi", "VH001")
+    
+    # Simulate SH002: Bangalore → Chennai
+    # run_realistic_simulation("SH002", "Bangalore", "Chennai", "VH002")

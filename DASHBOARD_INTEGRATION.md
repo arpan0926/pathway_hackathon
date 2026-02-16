@@ -1,199 +1,237 @@
-# Dashboard Integration Status
+# Dashboard Integration - Complete System
 
-## ✅ What Member 3 Built
-
-Member 3 has created an excellent dashboard with:
-
-1. **Live Command Center** 🗺️
-   - Real-time map showing vehicle locations
-   - Route visualization with teal-colored paths
-   - Interactive vehicle markers
-   - KPI metrics (Active Shipments, Fleet Speed, Network Status, Critical Anomalies)
-
-2. **AI Inspector** 📦
-   - Shipment selector dropdown
-   - Status badges (on_time / critical)
-   - Temperature monitoring
-   - ETA predictions
-   - Anomaly detection UI
-
-3. **AI Logistics Assistant (RAG)** 💬
-   - Chat interface for queries
-   - Placeholder for Member 4's RAG implementation
-   - Chat history management
-
-4. **Beautiful UI** 🎨
-   - Teal & Breeze color palette
-   - Professional styling
-   - Auto-refresh every 10 seconds
-   - Responsive layout
+## Overview
+The dashboard now integrates all components:
+- ✅ Real-time GPS telemetry from PostgreSQL
+- ✅ ETA predictions from Pathway pipeline
+- ✅ Active alerts from database
+- ✅ Groq-powered RAG chatbot
+- ✅ Live map visualization with pydeck
 
 ---
 
-## ✅ Fixes Applied
+## Data Flow
 
-I've updated the dashboard to work with our PostgreSQL setup:
-
-### 1. Fixed Dependencies
-Added missing packages to `dashboard/requirements.txt`:
-- `streamlit-autorefresh==1.0.1` - For auto-refresh functionality
-- `pydeck==0.8.0` - For map visualization
-- `psycopg2-binary==2.9.9` - For PostgreSQL connection
-
-### 2. Changed Database Connection
-- **Before**: SQLite (`shipments.db`)
-- **After**: PostgreSQL (using `DATABASE_URL` environment variable)
-
-### 3. Added Error Handling
-- Shows warning if database connection fails
-- Falls back to mock data for testing
+```
+GPS Simulator → PostgreSQL → Dashboard (Live Telemetry)
+                    ↓
+            Pathway Pipeline → eta_history table → Dashboard (ETA Predictions)
+                    ↓
+            Alert System → alerts table → Dashboard (Alert Status)
+                    ↓
+            Groq API ← Dashboard (RAG Chatbot)
+```
 
 ---
 
-## 🔌 Integration Points
+## Dashboard Features
 
-### For Member 1 (Pathway Pipeline):
-The dashboard reads from these tables:
-- `shipments` - Master shipment data
-- `telemetry` - Latest GPS coordinates
+### 1. Live Command Center Tab
 
-**Your pipeline should write to:**
-- `eta_history` table with ETA predictions
+#### KPI Metrics (Top Row)
+- **Active Shipments**: Total number of tracked shipments
+- **Fleet Avg Speed**: Average speed across all vehicles
+- **On-Time Shipments**: Count of shipments with no delays
+- **Critical Alerts**: Number of critical issues
 
-**Dashboard will automatically pick up:**
-- Latest GPS coordinates from `telemetry`
-- ETA predictions from `eta_history` (when you implement it)
+#### Live Map (Left Panel)
+- Real-time vehicle positions from telemetry table
+- Route lines from source to destination
+- Color-coded by status (teal = normal)
+- Hover tooltips show shipment ID and speed
 
-### For Member 2 (Backend):
-The dashboard currently queries PostgreSQL directly, but you can:
-1. Keep direct database access (current approach)
-2. OR create API endpoints and have dashboard call them
+#### AI Inspector (Right Panel)
+- Select any shipment to view details
+- Shows:
+  - Route (source → destination)
+  - Status badge (on_time/warning/critical)
+  - Cargo temperature (mock IoT data)
+  - ETA prediction from Pathway pipeline
+  - Delay reason analysis (if applicable)
 
-**Current query:**
+### 2. AI Logistics Assistant Tab
+
+#### RAG Chatbot Features
+- Powered by Groq's llama-3.1-8b-instant model
+- Context-aware responses using:
+  - Current shipment data
+  - GPS telemetry statistics
+  - Active alert counts
+- Ask questions like:
+  - "What's the status of SH001?"
+  - "How many shipments are delayed?"
+  - "Show me critical alerts"
+
+---
+
+## Database Queries
+
+### Telemetry Query
 ```sql
-SELECT s.shipment_id, s.source, s.destination, 
-       s.source_lat, s.source_lon, s.dest_lat, s.dest_lon,
-       t.lat, t.lon, t.speed_kmph AS avg_speed, t.load_status
-FROM shipments s
-LEFT JOIN telemetry t ON s.shipment_id = t.shipment_id
-WHERE t.ts = (SELECT MAX(ts) FROM telemetry t2 WHERE t2.shipment_id = s.shipment_id)
+WITH latest_telemetry AS (
+    SELECT DISTINCT ON (s.shipment_id)
+        s.shipment_id, s.source, s.destination,
+        s.source_lat, s.source_lon, s.dest_lat, s.dest_lon,
+        t.lat, t.lon, t.speed_kmph, t.load_status
+    FROM shipments s
+    LEFT JOIN telemetry t ON s.shipment_id = t.shipment_id
+    ORDER BY s.shipment_id, t.ts DESC
+)
+SELECT * FROM latest_telemetry;
 ```
 
-### For Member 4 (RAG Chatbot):
-Replace the `generate_rag_response()` function in `dashboard/app.py`:
+### ETA Predictions Query
+```sql
+SELECT DISTINCT ON (shipment_id)
+    shipment_id, predicted_eta, distance_remaining_km,
+    current_speed_kmph, confidence
+FROM eta_history
+WHERE shipment_id IN (...)
+ORDER BY shipment_id, computed_at DESC;
+```
 
+### Active Alerts Query
+```sql
+SELECT shipment_id, COUNT(*) as alert_count,
+       MAX(CASE WHEN alert_type = 'critical' THEN 1 ELSE 0 END) as has_critical
+FROM alerts
+WHERE is_active = true
+GROUP BY shipment_id;
+```
+
+---
+
+## Alert Level Logic
+
+The dashboard determines alert levels based on:
+
+1. **Critical** (Red):
+   - Has critical alerts in database
+   - ETA > 240 minutes (4 hours)
+   - Temperature breach detected
+
+2. **Warning** (Yellow):
+   - ETA > 180 minutes (3 hours)
+   - Speed < 40 km/h (traffic congestion)
+   - Minor alerts present
+
+3. **On Time** (Green):
+   - ETA < 180 minutes
+   - Normal speed (> 40 km/h)
+   - No active alerts
+
+---
+
+## Delay Reason Analysis
+
+Automatically generated based on:
+- **Traffic**: Speed < 50 km/h
+- **Cold-chain issue**: Temperature > -5°C
+- **Route deviation**: Critical alert + normal speed
+- **System alerts**: Active alerts in database
+
+---
+
+## Auto-Refresh
+
+Dashboard refreshes every 10 seconds to show:
+- Latest GPS positions
+- Updated ETA predictions
+- New alerts
+- Real-time KPI changes
+
+Configure refresh rate:
 ```python
-def generate_rag_response(user_query, context_df):
-    """Member 4: Plug your LangChain/LlamaIndex RAG code here."""
-    # Your RAG implementation
-    # Use context_df for current shipment data
-    # Query your document store
-    # Return AI-generated response
-    return response_text
+REFRESH_RATE = 10  # seconds
 ```
 
 ---
 
-## 🚀 Testing the Dashboard
+## Environment Variables Required
 
-### 1. Rebuild Dashboard Container
 ```bash
-docker-compose down
-docker-compose up --build dashboard
-```
-
-### 2. Access Dashboard
-Open browser: http://localhost:8501
-
-### 3. What You'll See
-
-**With Mock Data (no GPS data yet):**
-- 4 sample shipments (Mumbai-Delhi, Bangalore-Chennai, etc.)
-- Map with vehicle locations
-- Random ETA predictions
-- Sample anomalies
-
-**With Real Data (after Member 2 implements simulator):**
-- Real GPS coordinates from `telemetry` table
-- Live vehicle movement
-- Actual ETA from Member 1's pipeline
-- Real alerts from Member 2's logic
-
----
-
-## 📊 Data Flow
-
-```
-Member 2 (GPS Simulator)
-    ↓ writes to
-PostgreSQL (telemetry table)
-    ↓ reads from
-Member 1 (Pathway Pipeline)
-    ↓ writes to
-PostgreSQL (eta_history table)
-    ↓ reads from
-Dashboard (Member 3)
-    ↓ displays
-Live Map & Metrics
+DATABASE_URL=postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
 ---
 
-## 🎯 Next Steps
+## Testing the Integration
 
-### For Member 1 (YOU):
-1. Implement Pathway pipeline to read from `telemetry`
-2. Calculate ETA
-3. Write to `eta_history` table
-4. Dashboard will automatically show your ETA predictions
+### 1. Start All Services
+```bash
+docker-compose up
+```
 
-### For Member 2:
-1. Implement GPS simulator to write to `telemetry` table
-2. Dashboard will automatically show vehicle movement
-3. Optionally: Implement alert logic
+### 2. Verify Data Flow
+- GPS Simulator: Check logs for "🟢 SH001: (lat, lon) @ speed"
+- Pathway Pipeline: Check logs for "🔴 SH001: distance km away | ETA: X min"
+- Dashboard: Open http://localhost:8501
 
-### For Member 3:
-✅ Dashboard is ready!
-- Test with real data once Member 1 & 2 implement their parts
-- Fine-tune UI based on real data
-- Add more features if needed
+### 3. Check Database
+```bash
+# Check telemetry data
+docker exec -it supply_chain_db psql -U supply_chain_user -d supply_chain_db \
+  -c "SELECT COUNT(*) FROM telemetry;"
 
-### For Member 4:
-1. Implement RAG chatbot
-2. Replace `generate_rag_response()` function
-3. Test with dashboard's chat interface
+# Check ETA predictions
+docker exec -it supply_chain_db psql -U supply_chain_user -d supply_chain_db \
+  -c "SELECT * FROM eta_history ORDER BY computed_at DESC LIMIT 5;"
+```
 
----
-
-## 🐛 Troubleshooting
-
-### Dashboard shows "Database connection failed"
-- Check if PostgreSQL container is running: `docker ps`
-- Check DATABASE_URL environment variable
-- Verify database has data: `docker exec -it supply_chain_db psql -U supply_chain_user -d supply_chain_db`
-
-### Map not showing
-- Check if `pydeck` is installed
-- Verify GPS coordinates are valid (lat/lon)
-- Check browser console for errors
-
-### Auto-refresh not working
-- Check if `streamlit-autorefresh` is installed
-- Refresh rate is set to 10 seconds
+### 4. Test Chatbot
+- Go to "AI Logistics Assistant" tab
+- Ask: "What's the current status of all shipments?"
+- Should get context-aware response from Groq
 
 ---
 
-## 📝 Summary
+## Troubleshooting
 
-✅ Dashboard is production-ready  
-✅ Connected to PostgreSQL  
-✅ Auto-refresh enabled  
-✅ Beautiful UI with teal theme  
-✅ Ready for real data integration  
+### No Data on Dashboard
+- Check if GPS simulator is running: `docker logs gps_simulator`
+- Verify telemetry table has data: `SELECT COUNT(*) FROM telemetry;`
+- Check dashboard logs: `docker logs dashboard`
 
-**Great work, Member 3! 🎉**
+### ETA Not Showing
+- Verify Pathway pipeline is running: `docker logs pathway_pipeline`
+- Check eta_history table: `SELECT COUNT(*) FROM eta_history;`
+- Pipeline may take 30-60 seconds to start producing predictions
 
-Now waiting for:
-- Member 1: ETA calculations
-- Member 2: GPS data stream
-- Member 4: RAG chatbot
+### Chatbot Not Working
+- Verify GROQ_API_KEY is set in .env file
+- Check dashboard logs for API errors
+- Test API key: `curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"`
+
+### Map Not Rendering
+- Check if pydeck is installed: `pip list | grep pydeck`
+- Verify lat/lon values are valid numbers
+- Check browser console for JavaScript errors
+
+---
+
+## Performance Notes
+
+- Dashboard queries use `DISTINCT ON` for efficiency
+- Auto-refresh limited to 10 seconds to avoid overload
+- Telemetry query only fetches latest position per shipment
+- ETA predictions cached per refresh cycle
+
+---
+
+## Next Steps for Demo
+
+1. Let GPS simulator run for 2-3 minutes to generate data
+2. Verify live map shows moving vehicles
+3. Check ETA predictions are updating
+4. Test chatbot with sample questions
+5. Take screenshots for presentation
+
+---
+
+## Member Responsibilities
+
+- **Member 1**: Pathway pipeline outputs to eta_history table ✅
+- **Member 2**: GPS simulator + API endpoints ✅
+- **Member 3**: Dashboard visualization + integration ✅
+- **Member 4**: RAG chatbot with Groq API ✅

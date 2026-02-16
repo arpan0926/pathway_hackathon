@@ -21,18 +21,26 @@ build/
 .env
 .env.local
 
-# Data
+# Data - exclude all generated data
 *.log
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/*.csv
+data/*.json
 
-# Outputs
+# Outputs - exclude all generated outputs
 outputs/*
 !outputs/.gitkeep
 logs/*
 !logs/.gitkeep
+
+# Pathway pipeline generated files
+pathway_pipeline/data/*.csv
+pathway_pipeline/outputs/*.csv
+pathway_pipeline/*.csv
+pathway_pipeline/venv/
 
 # Docker
 *.pid
@@ -48,7 +56,13 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Test files (keep test directory structure but ignore generated files)
+# Test files
 pathway_pipeline/test/*.csv
 pathway_pipeline/test/gps_stream.csv
 pathway_pipeline/test/processed_output.csv
+
+# Temporary/demo files
+test_*.py
+check_*.py
+*_test.py
+gps_test.py

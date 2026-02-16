@@ -35,7 +35,7 @@ services:
     volumes:
       - ./backend:/app
       - ./shared:/app/shared
-    command: python simulator.py
+    command: python gps_simulator.py
     networks:
       - supply-chain-network
     restart: unless-stopped
@@ -57,7 +57,7 @@ services:
       - ./shared:/app/shared
       - ./data:/app/data
       - ./outputs:/app/outputs
-    command: python pipeline.py
+    command: sh -c "python postgres_to_csv_bridge.py & python pipeline.py"
     networks:
       - supply-chain-network
     restart: unless-stopped
@@ -91,10 +91,13 @@ services:
       dockerfile: Dockerfile
     container_name: dashboard
     environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
       BACKEND_URL: http://backend-api:8000
+      GROQ_API_KEY: ${GROQ_API_KEY}
       PYTHONUNBUFFERED: 1
     depends_on:
       - backend-api
+      - postgres
     ports:
       - "8501:8501"
     volumes:
@@ -105,23 +108,28 @@ services:
       - supply-chain-network
     restart: unless-stopped
 
-  # Member 4: GenAI Chatbot (optional - can run separately)
-  # chatbot:
-  #   build:
-  #     context: ./genai_rag
-  #     dockerfile: Dockerfile
-  #   container_name: chatbot
-  #   environment:
-  #     BACKEND_URL: http://backend-api:8000
-  #     OPENAI_API_KEY: ${OPENAI_API_KEY}
-  #     PYTHONUNBUFFERED: 1
-  #   depends_on:
-  #     - backend-api
-  #   volumes:
-  #     - ./genai_rag:/app
-  #     - ./shared:/app/shared
-  #   networks:
-  #     - supply-chain-network
+  # Member 4: GenAI Chatbot
+  chatbot:
+    build:
+      context: ./genai_rag
+      dockerfile: Dockerfile
+    container_name: chatbot
+    environment:
+      BACKEND_URL: http://backend-api:8000
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./genai_rag:/app
+      - ./shared:/app/shared
+    command: python simple_chat.py
+    networks:
+      - supply-chain-network
+    stdin_open: true
+    tty: true
 
 networks:
   supply-chain-network:

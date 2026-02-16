@@ -1,14 +1,21 @@
-FROM pathwaycom/pathway:latest
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install Groq for RAG bot
-RUN pip install groq
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy files
-COPY pipeline.py .
-COPY rag_bot.py .
-COPY prompts.py .
+# Copy requirements
+COPY requirements.txt .
 
-# Default command (can be overridden in docker-compose)
-CMD ["python", "pipeline.py"]
+# Install Python packages
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY . .
+
+# Default command
+CMD ["python", "simple_chat.py"]
