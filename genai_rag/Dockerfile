@@ -8,14 +8,11 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Install dependencies
 COPY requirements.txt .
-
-# Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
+# Copy application code
 COPY . .
 
-# Default command
-CMD ["python", "simple_chat.py"]
+CMD ["uvicorn", "rag_api:app", "--host", "0.0.0.0", "--port", "8001"]

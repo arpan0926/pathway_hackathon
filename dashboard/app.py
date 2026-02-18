@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import os
-import random
-import time
-import textwrap
 import psycopg2
+import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime, timedelta
 
 try:
     import pydeck as pdk
@@ -13,132 +13,478 @@ except ImportError:
 from streamlit_autorefresh import st_autorefresh
 
 # ---------------------------------------------------------
-# 1. UI CONFIGURATION & THEME (MEMBER 3)
+# CONFIGURATION
 # ---------------------------------------------------------
-st.set_page_config(page_title="Supply Chain Command Center", page_icon="🚚", layout="wide")
+st.set_page_config(
+    page_title="Supply Chain Intelligence Platform", 
+    page_icon="🚛", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# PostgreSQL connection from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db")
-REFRESH_RATE = 10 
+REFRESH_RATE = 10
 
+# ---------------------------------------------------------
+# PROFESSIONAL STYLING
+# ---------------------------------------------------------
 st.markdown("""
 <style>
-    /* --- TEAL & BREEZE PALETTE --- */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
     :root {
-        --teal-dark: #125e6e;    
-        --teal-mid: #0a8799;     
-        --teal-light: #82b4b9;   
-        --bg-breeze: #EBF4F6;    
+        --primary: #0066FF;
+        --success: #00C48C;
+        --warning: #FFA500;
+        --danger: #FF4757;
+        --info: #17A2B8;
         
-        --card-bg: #ffffff;
-        --border: #82b4b9;
+        --bg-dark: #0A0E27;
+        --bg-darker: #050814;
+        --surface: #141B3D;
+        --surface-light: #1E2749;
         
-        --text-main: #125e6e;
-        --text-muted: #5a8a92;
-        --danger: #d32f2f;       
+        --text-primary: #FFFFFF;
+        --text-secondary: #A0AEC0;
+        --text-muted: #718096;
         
-        --shadow: 0 4px 12px -2px rgba(18, 94, 110, 0.15);
+        --border: #2D3748;
+        --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
     }
     
-    .stApp { background-color: var(--bg-breeze); font-family: 'Inter', sans-serif; }
+    .stApp {
+        background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+        font-family: 'Inter', sans-serif;
+    }
     
     /* Sidebar Styling */
-    [data-testid="stSidebar"] { background-color: var(--card-bg); border-right: 2px solid var(--border); }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: var(--teal-dark) !important; }
+    [data-testid="stSidebar"] {
+        background: var(--surface) !important;
+        border-right: 1px solid var(--border);
+    }
     
-    /* Typography */
-    h1, h2, h3 { color: var(--teal-dark) !important; font-weight: 800 !important; }
-    p, div, span, small { color: var(--text-main); }
+    [data-testid="stSidebar"] h1, h2, h3 {
+        color: var(--text-primary) !important;
+    }
     
-    .dashboard-header { margin-bottom: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 1rem; }
-    .dashboard-card { background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; box-shadow: var(--shadow); }
+    /* Header */
+    .platform-header {
+        background: linear-gradient(135deg, #0066FF 0%, #00C48C 100%);
+        padding: 1.5rem 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: var(--shadow);
+    }
     
-    /* Badges & Alerts */
-    .badge { display: inline-block; padding: 0.4em 0.8em; font-size: 0.85rem; font-weight: 800; border-radius: 8px; text-transform: uppercase; }
-    .badge-critical { background: #ffebee; color: var(--danger) !important; border: 1px solid #ffcdd2; }
-    .badge-ontime { background: var(--bg-breeze); color: var(--teal-mid) !important; border: 1px solid var(--teal-light); }
-    .reason-box { background: #f8fbfc; border-left: 5px solid var(--teal-mid); padding: 15px; margin-top: 15px; border-radius: 8px; }
+    .platform-title {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: white !important;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
     
-    /* Streamlit Tab Styling for Light Theme */
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
-    .stTabs [data-baseweb="tab"] { height: 50px; white-space: pre-wrap; background-color: transparent; border-radius: 4px 4px 0px 0px; gap: 1px; padding-top: 10px; padding-bottom: 10px; color: var(--teal-dark); }
-    .stTabs [aria-selected="true"] { color: var(--teal-mid) !important; font-weight: 800; border-bottom: 3px solid var(--teal-mid); }
+    .platform-subtitle {
+        color: rgba(255, 255, 255, 0.85) !important;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
     
-    /* Selectbox Fixes */
-    div[data-baseweb="select"] > div { background-color: var(--card-bg) !important; color: var(--teal-dark) !important; border: 2px solid var(--teal-light) !important; border-radius: 12px !important; }
-    div[data-baseweb="select"] span { color: var(--teal-dark) !important; font-weight: 600 !important; }
-    div[data-baseweb="select"] svg { fill: var(--teal-dark) !important; }
-    ul[data-baseweb="menu"] { background-color: var(--card-bg) !important; }
-    li[data-baseweb="option"] { color: var(--teal-dark) !important; }
+    /* Metrics Cards */
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .metric-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow);
+    }
+    
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-muted) !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-primary) !important;
+        line-height: 1;
+    }
+    
+    .metric-delta {
+        font-size: 0.75rem;
+        margin-top: 0.5rem;
+        font-weight: 600;
+    }
+    
+    /* Panel Styles */
+    .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .panel-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-primary) !important;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .panel-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    /* Status Badge */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.875rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    
+    .status-success { background: rgba(0, 196, 140, 0.15); color: var(--success) !important; border: 1px solid rgba(0, 196, 140, 0.3); }
+    .status-warning { background: rgba(255, 165, 0, 0.15); color: var(--warning) !important; border: 1px solid rgba(255, 165, 0, 0.3); }
+    .status-danger { background: rgba(255, 71, 87, 0.15); color: var(--danger) !important; border: 1px solid rgba(255, 71, 87, 0.3); }
+    .status-info { background: rgba(23, 162, 184, 0.15); color: var(--info) !important; border: 1px solid rgba(23, 162, 184, 0.3); }
+    
+    /* Table Styles */
+    .data-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .data-table th {
+        background: var(--surface-light);
+        color: var(--text-secondary) !important;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.875rem 1rem;
+        font-weight: 600;
+        border-bottom: 2px solid var(--border);
+        text-align: left;
+    }
+    
+    .data-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-primary) !important;
+        font-size: 0.875rem;
+    }
+    
+    .data-table tr:hover {
+        background: var(--surface-light);
+        cursor: pointer;
+    }
+    
+    /* Filter Pills */
+    .filter-chip {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: var(--surface-light);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.875rem;
+        color: var(--text-secondary) !important;
+    }
+    
+    .filter-chip:hover {
+        background: var(--primary);
+        color: white !important;
+        border-color: var(--primary);
+    }
+    
+    .filter-chip.active {
+        background: var(--primary);
+        color: white !important;
+        border-color: var(--primary);
+    }
+    
+    /* Chat Interface */
+    .chat-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        height: calc(100vh - 200px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    
+    .chat-header {
+        background: var(--surface-light);
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+    }
+    
+    .chat-input-area {
+        padding: 1.25rem;
+        border-top: 1px solid var(--border);
+        background: var(--surface-light);
+    }
+    
+    /* Quick Actions */
+    .quick-action {
+        background: var(--surface-light);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.875rem 1.25rem;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.875rem;
+        color: var(--text-primary) !important;
+    }
+    
+    .quick-action:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        transform: translateX(4px);
+    }
+    
+    /* Progress Bars */
+    .progress-bar {
+        height: 8px;
+        background: var(--surface-light);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background: var(--surface);
+        padding: 0.5rem;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        border-radius: 8px;
+        color: var(--text-secondary) !important;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background: var(--surface-light);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: var(--primary) !important;
+        color: white !important;
+    }
+    
+    /* Streamlit Overrides */
+    .stSelectbox > div > div {
+        background: var(--surface-light) !important;
+        border-color: var(--border) !important;
+        color: var(--text-primary) !important;
+    }
+    
+    .stButton > button {
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.625rem 1.25rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .stButton > button:hover {
+        background: #0052CC;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+    }
+    
+    /* Alerts */
+    .alert-item {
+        background: var(--surface-light);
+        border-left: 4px solid var(--danger);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+    }
+    
+    .alert-item.warning {
+        border-left-color: var(--warning);
+    }
+    
+    .alert-time {
+        font-size: 0.75rem;
+        color: var(--text-muted) !important;
+        margin-bottom: 0.25rem;
+    }
+    
+    .alert-message {
+        color: var(--text-primary) !important;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    
+    /* Map Legend */
+    .map-legend {
+        background: rgba(20, 27, 61, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        z-index: 1000;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-primary) !important;
+    }
+    
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--bg-dark);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. DATA PIPELINE INTEGRATION (MEMBER 1 & 2)
+# DATA FUNCTIONS
 # ---------------------------------------------------------
+@st.cache_data(ttl=10)
 def fetch_live_telemetry():
-    """Fetch real-time telemetry data from database"""
+    """Fetch real-time telemetry data"""
     try:
-        # Try using SQLAlchemy for pandas
-        try:
-            from sqlalchemy import create_engine
-            engine = create_engine(DATABASE_URL)
-            query = """
-            WITH latest_telemetry AS (
-                SELECT DISTINCT ON (s.shipment_id)
-                    s.shipment_id,
-                    s.source,
-                    s.destination,
-                    s.source_lat,
-                    s.source_lon,
-                    s.dest_lat,
-                    s.dest_lon,
-                    s.status,
-                    t.lat,
-                    t.lon,
-                    t.speed_kmph as avg_speed,
-                    t.load_status,
-                    t.ts as last_update
-                FROM shipments s
-                LEFT JOIN telemetry t ON s.shipment_id = t.shipment_id
-                ORDER BY s.shipment_id, t.ts DESC NULLS LAST
-            )
-            SELECT * FROM latest_telemetry;
-            """
-            df = pd.read_sql(query, engine)
-        except ImportError:
-            # Fallback to psycopg2 direct connection
-            conn = psycopg2.connect(DATABASE_URL)
-            query = """
-            WITH latest_telemetry AS (
-                SELECT DISTINCT ON (s.shipment_id)
-                    s.shipment_id,
-                    s.source,
-                    s.destination,
-                    s.source_lat,
-                    s.source_lon,
-                    s.dest_lat,
-                    s.dest_lon,
-                    s.status,
-                    t.lat,
-                    t.lon,
-                    t.speed_kmph as avg_speed,
-                    t.load_status,
-                    t.ts as last_update
-                FROM shipments s
-                LEFT JOIN telemetry t ON s.shipment_id = t.shipment_id
-                ORDER BY s.shipment_id, t.ts DESC NULLS LAST
-            )
-            SELECT * FROM latest_telemetry;
-            """
-            df = pd.read_sql(query, conn)
-            conn.close()
+        conn = psycopg2.connect(DATABASE_URL)
+        query = """
+        WITH latest_telemetry AS (
+            SELECT DISTINCT ON (s.shipment_id)
+                s.shipment_id,
+                s.source,
+                s.destination,
+                s.source_lat,
+                s.source_lon,
+                s.dest_lat,
+                s.dest_lon,
+                s.status,
+                t.lat,
+                t.lon,
+                t.speed_kmph as avg_speed,
+                t.load_status,
+                t.ts as last_update
+            FROM shipments s
+            LEFT JOIN telemetry t ON s.shipment_id = t.shipment_id
+            ORDER BY s.shipment_id, t.ts DESC NULLS LAST
+        )
+        SELECT * FROM latest_telemetry;
+        """
+        df = pd.read_sql(query, conn)
+        conn.close()
         
         if df.empty:
-            st.warning("⚠️ No telemetry data available yet. GPS simulator may still be starting...")
             return pd.DataFrame()
         
-        # Handle None values
         df['lat'] = df['lat'].fillna(df['source_lat'])
         df['lon'] = df['lon'].fillna(df['source_lon'])
         df['avg_speed'] = df['avg_speed'].fillna(60.0)
@@ -146,11 +492,11 @@ def fetch_live_telemetry():
         
         return df
     except Exception as e:
-        st.error(f"❌ Database error: {e}")
+        st.error(f"Database error: {e}")
         return pd.DataFrame()
 
 def fetch_eta_predictions(shipment_ids):
-    """Fetch latest ETA predictions from Pathway pipeline output"""
+    """Fetch ETA predictions"""
     try:
         if not shipment_ids:
             return {}
@@ -162,7 +508,6 @@ def fetch_eta_predictions(shipment_ids):
                 shipment_id,
                 predicted_eta,
                 distance_remaining_km,
-                current_speed_kmph,
                 confidence,
                 computed_at
             FROM eta_history
@@ -172,12 +517,10 @@ def fetch_eta_predictions(shipment_ids):
         SELECT * FROM latest_eta;
         """
         
-        # Use psycopg2 directly
         conn = psycopg2.connect(DATABASE_URL)
         df = pd.read_sql(query, conn, params=list(shipment_ids))
         conn.close()
         
-        # Convert to dictionary for easy lookup
         eta_dict = {}
         for _, row in df.iterrows():
             eta_dict[row['shipment_id']] = {
@@ -186,18 +529,16 @@ def fetch_eta_predictions(shipment_ids):
                 'confidence': row['confidence']
             }
             
-            # Calculate ETA in minutes if predicted_eta exists
             if pd.notnull(row['predicted_eta']):
                 eta_minutes = (row['predicted_eta'] - pd.Timestamp.now()).total_seconds() / 60
                 eta_dict[row['shipment_id']]['predicted_eta_minutes'] = max(0, int(eta_minutes))
         
         return eta_dict
-    except Exception as e:
-        st.warning(f"⚠️ ETA data not available: {e}")
+    except:
         return {}
 
 def fetch_active_alerts(shipment_ids):
-    """Fetch active alerts from database"""
+    """Fetch active alerts"""
     try:
         if not shipment_ids:
             return {}
@@ -211,7 +552,6 @@ def fetch_active_alerts(shipment_ids):
         GROUP BY shipment_id;
         """
         
-        # Use psycopg2 directly
         conn = psycopg2.connect(DATABASE_URL)
         df = pd.read_sql(query, conn, params=list(shipment_ids))
         conn.close()
@@ -224,23 +564,18 @@ def fetch_active_alerts(shipment_ids):
             }
         
         return alert_dict
-    except Exception as e:
+    except:
         return {}
 
-def fetch_model_predictions(df):
-    """Integrate ETA predictions and alerts with telemetry data"""
+def enrich_telemetry_data(df):
+    """Add predictions and analytics"""
     if df.empty:
         return df
     
-    # Fetch ETA predictions from Pathway pipeline
-    shipment_ids = df['shipment_id'].tolist()
-    eta_data = fetch_eta_predictions(shipment_ids)
-    alert_data = fetch_active_alerts(shipment_ids)
+    import math
     
-    # Helper function to calculate distance using Haversine formula
-    def haversine_distance(lat1, lon1, lat2, lon2):
-        import math
-        R = 6371  # Earth's radius in km
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371
         lat1_rad = math.radians(lat1)
         lat2_rad = math.radians(lat2)
         delta_lat = math.radians(lat2 - lat1)
@@ -249,28 +584,24 @@ def fetch_model_predictions(df):
         c = 2 * math.asin(math.sqrt(a))
         return R * c
     
-    # Merge predictions into dataframe
-    predictions = []
+    shipment_ids = df['shipment_id'].tolist()
+    eta_data = fetch_eta_predictions(shipment_ids)
+    alert_data = fetch_active_alerts(shipment_ids)
+    
+    enriched = []
     for _, row in df.iterrows():
         sid = row['shipment_id']
-        
-        # Get ETA prediction
         eta_info = eta_data.get(sid, {})
-        predicted_eta = eta_info.get('predicted_eta_minutes', 180)  # Default 3 hours
+        predicted_eta = eta_info.get('predicted_eta_minutes', 180)
         confidence = eta_info.get('confidence', 85.0)
         distance_km = eta_info.get('distance_km')
         
-        # Calculate distance if not available from ETA history
         if distance_km is None or distance_km == 0:
             try:
-                distance_km = haversine_distance(
-                    row['lat'], row['lon'],
-                    row['dest_lat'], row['dest_lon']
-                )
+                distance_km = haversine(row['lat'], row['lon'], row['dest_lat'], row['dest_lon'])
             except:
                 distance_km = 0
         
-        # Determine alert level based on ETA and speed
         alert_info = alert_data.get(sid, {'count': 0, 'has_critical': False})
         avg_speed = row.get('avg_speed', 60.0)
         
@@ -281,96 +612,38 @@ def fetch_model_predictions(df):
         else:
             alert_level = 'on_time'
         
-        # Mock temperature (in real system, this would come from IoT sensors)
         temperature = -18.5 if alert_level != 'critical' else 4.2
         
-        predictions.append({
+        enriched.append({
             **row.to_dict(),
             'predicted_eta': predicted_eta,
             'alert_level': alert_level,
             'temperature': temperature,
             'confidence': confidence,
             'distance_km': distance_km,
-            'alert_count': alert_info['count']
+            'alert_count': alert_info['count'],
+            'progress': max(0, min(100, 100 - (distance_km / (distance_km + 500) * 100)))
         })
     
-    result_df = pd.DataFrame(predictions)
-    
-    # Calculate delay reasons
-    def calculate_delay_reason(row):
-        if row['alert_level'] == 'on_time':
-            return ""
-        
-        reasons = []
-        avg_speed = row.get('avg_speed', 60.0)
-        temperature = row.get('temperature', -18.5)
-        
-        if avg_speed < 50:
-            reasons.append("Heavy traffic congestion or roadwork detected.")
-        if temperature > -5:
-            reasons.append("Mandatory halt required for cold-chain unit inspection.")
-        if row['alert_level'] == 'critical' and avg_speed >= 50:
-            reasons.append("Unexpected route deviation detected.")
-        if row.get('alert_count', 0) > 0:
-            reasons.append(f"{row['alert_count']} active system alerts.")
-            
-        return " ".join(reasons) if reasons else "Minor weather disruptions."
+    return pd.DataFrame(enriched)
 
-    result_df['delay_reason'] = result_df.apply(calculate_delay_reason, axis=1)
-    
-    return result_df
-
-def get_dashboard_data():
-    raw_df = fetch_live_telemetry()
-    if raw_df.empty:
-        return raw_df
-    final_df = fetch_model_predictions(raw_df)
-    return final_df
-
-# ---------------------------------------------------------
-# 3. RAG CHATBOT INTEGRATION (MEMBER 4)
-# ---------------------------------------------------------
 def generate_rag_response(user_query, context_df):
-    """Member 4: Groq-powered RAG chatbot integration"""
+    """RAG chatbot"""
     try:
         import requests
         
-        # Get API key from environment
         groq_api_key = os.getenv("GROQ_API_KEY")
         if not groq_api_key:
-            return "⚠️ Groq API key not configured. Please set GROQ_API_KEY in .env file."
+            return "⚠️ Groq API key not configured."
         
-        # Prepare context from current shipment data
-        context = "Current Supply Chain Status:\n"
+        context = "Supply Chain Status:\n"
         if not context_df.empty:
             for _, row in context_df.iterrows():
                 context += f"\n- Shipment {row['shipment_id']}: {row['source']} → {row['destination']}"
-                context += f"\n  Speed: {row.get('avg_speed', 0):.1f} km/h, Status: {row.get('load_status', 'N/A')}"
-                if 'predicted_eta' in row:
-                    context += f", ETA: {row['predicted_eta']:.0f} minutes"
-                if 'alert_level' in row and row['alert_level'] != 'on_time':
-                    context += f", Alert: {row['alert_level']}"
+                context += f"\n  Speed: {row.get('avg_speed', 0):.1f} km/h, ETA: {row.get('predicted_eta', 0):.0f} min"
+                if row.get('alert_level') != 'on_time':
+                    context += f", Status: {row['alert_level']}"
         
-        # Query database for additional context
-        try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            
-            # Get total telemetry count
-            cur.execute("SELECT COUNT(*) FROM telemetry")
-            telemetry_count = cur.fetchone()[0]
-            
-            # Get active alerts
-            cur.execute("SELECT COUNT(*) FROM alerts WHERE is_active = true")
-            alert_count = cur.fetchone()[0]
-            
-            context += f"\n\nSystem Stats: {telemetry_count} GPS records, {alert_count} active alerts"
-            
-            conn.close()
-        except:
-            pass
-        
-        # Call Groq API
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
@@ -380,14 +653,8 @@ def generate_rag_response(user_query, context_df):
             json={
                 "model": "llama-3.1-8b-instant",
                 "messages": [
-                    {
-                        "role": "system",
-                        "content": f"You are a helpful supply chain logistics assistant. Use this context to answer questions:\n\n{context}"
-                    },
-                    {
-                        "role": "user",
-                        "content": user_query
-                    }
+                    {"role": "system", "content": f"You are a supply chain analyst. Use this data:\n\n{context}"},
+                    {"role": "user", "content": user_query}
                 ],
                 "temperature": 0.7,
                 "max_tokens": 500
@@ -398,127 +665,376 @@ def generate_rag_response(user_query, context_df):
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
-            return f"⚠️ API Error: {response.status_code} - {response.text[:200]}"
+            return f"⚠️ API Error: {response.status_code}"
             
     except Exception as e:
-        return f"⚠️ Chatbot error: {str(e)}. Check if GROQ_API_KEY is set correctly."
+        return f"⚠️ Error: {str(e)}"
 
 # ---------------------------------------------------------
-# 4. DASHBOARD UI RENDERING (MEMBER 3)
+# UI COMPONENTS
 # ---------------------------------------------------------
-st_autorefresh(interval=REFRESH_RATE * 1000, key="datarefresh")
-
-st.markdown('<div class="dashboard-header"><h1>🚛 Pathway Supply Chain OS</h1></div>', unsafe_allow_html=True)
-
-df = get_dashboard_data()
-
-# --- MAIN NAVIGATION ---
-tab_map, tab_chat = st.tabs(["🗺️ Live Command Center", "💬 AI Logistics Assistant (RAG)"])
-
-# ==========================================
-# TAB 1: LIVE MAP & INSPECTOR
-# ==========================================
-with tab_map:
-    # Top KPI Metrics
-    c1, c2, c3, c4 = st.columns(4)
-    active_count = len(df)
-    avg_speed = int(df["avg_speed"].mean()) if not df.empty and "avg_speed" in df else 0
-    critical_count = len(df[df["alert_level"]=="critical"]) if not df.empty and "alert_level" in df else 0
-    on_time_count = len(df[df["alert_level"]=="on_time"]) if not df.empty and "alert_level" in df else 0
+def render_metric_card(label, value, delta=None, delta_positive=True, color="primary"):
+    """Render a metric card"""
+    delta_html = ""
+    if delta:
+        delta_color = "var(--success)" if delta_positive else "var(--danger)"
+        delta_icon = "↑" if delta_positive else "↓"
+        delta_html = f'<div class="metric-delta" style="color: {delta_color} !important;">{delta_icon} {delta}</div>'
     
-    with c1: st.markdown(f'<div class="dashboard-card"><div style="color:var(--text-muted); font-weight:bold; font-size:0.9rem;">ACTIVE SHIPMENTS</div><div style="font-size:2rem; font-weight:900; color:var(--teal-mid);">{active_count}</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="dashboard-card"><div style="color:var(--text-muted); font-weight:bold; font-size:0.9rem;">FLEET AVG SPEED</div><div style="font-size:2rem; font-weight:900; color:var(--teal-mid);">{avg_speed} km/h</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="dashboard-card"><div style="color:var(--text-muted); font-weight:bold; font-size:0.9rem;">ON-TIME SHIPMENTS</div><div style="font-size:2rem; font-weight:900; color:var(--teal-mid);">{on_time_count}</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="dashboard-card"><div style="color:var(--danger); font-weight:bold; font-size:0.9rem;">CRITICAL ALERTS</div><div style="font-size:2rem; font-weight:900; color:var(--danger);">{critical_count}</div></div>', unsafe_allow_html=True)
+    color_map = {
+        "primary": "var(--primary)",
+        "success": "var(--success)",
+        "warning": "var(--warning)",
+        "danger": "var(--danger)"
+    }
     
-    st.write("")
-    col_map, col_details = st.columns([2, 1])
+    st.markdown(f'''
+    <div class="metric-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value" style="color: {color_map.get(color, 'var(--primary)')} !important;">{value}</div>
+        {delta_html}
+    </div>
+    ''', unsafe_allow_html=True)
 
-    # Live Map Rendering
-    with col_map:
-        st.markdown("### 🗺️ Live Fleet Tracking")
+# ---------------------------------------------------------
+# MAIN APPLICATION
+# ---------------------------------------------------------
+st_autorefresh(interval=REFRESH_RATE * 1000, key="refresh")
+
+# Sidebar
+with st.sidebar:
+    st.markdown('<div class="panel-title">⚙️ Control Panel</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    st.markdown("### 📊 View Mode")
+    view_mode = st.radio("", ["Overview", "Analytics", "Operations"], label_visibility="collapsed")
+    
+    st.markdown("### 🔍 Filters")
+    status_filter = st.multiselect(
+        "Status",
+        ["on_time", "warning", "critical"],
+        default=["on_time", "warning", "critical"]
+    )
+    
+    st.markdown("### 📍 Routes")
+    show_all_routes = st.checkbox("Show all routes", value=True)
+    
+    st.markdown("---")
+    st.markdown("### 🚨 Quick Alerts")
+    
+    df_temp = fetch_live_telemetry()
+    if not df_temp.empty:
+        df_enriched = enrich_telemetry_data(df_temp)
+        critical = len(df_enriched[df_enriched['alert_level'] == 'critical'])
+        warning = len(df_enriched[df_enriched['alert_level'] == 'warning'])
+        
+        if critical > 0:
+            st.markdown(f'''
+            <div class="alert-item">
+                <div class="alert-time">{datetime.now().strftime("%H:%M")}</div>
+                <div class="alert-message">🔴 {critical} critical shipment(s)</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        if warning > 0:
+            st.markdown(f'''
+            <div class="alert-item warning">
+                <div class="alert-time">{datetime.now().strftime("%H:%M")}</div>
+                <div class="alert-message">⚠️ {warning} delayed shipment(s)</div>
+            </div>
+            ''', unsafe_allow_html=True)
+
+# Header
+st.markdown('''
+<div class="platform-header">
+    <div class="platform-title">🚛 Supply Chain Intelligence Platform</div>
+    <div class="platform-subtitle">Real-time monitoring • Predictive analytics • AI-powered insights</div>
+</div>
+''', unsafe_allow_html=True)
+
+# Fetch data
+df = fetch_live_telemetry()
+if not df.empty:
+    df = enrich_telemetry_data(df)
+    
+    # Filter by status
+    if status_filter:
+        df = df[df['alert_level'].isin(status_filter)]
+
+# Main Content
+if view_mode == "Overview":
+    # KPI Metrics
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        total = len(df) if not df.empty else 0
+        render_metric_card("Total Shipments", total, "+3 today", True, "primary")
+    
+    with col2:
+        on_time = len(df[df['alert_level'] == 'on_time']) if not df.empty else 0
+        render_metric_card("On Time", on_time, "95%", True, "success")
+    
+    with col3:
+        avg_speed = int(df['avg_speed'].mean()) if not df.empty else 0
+        render_metric_card("Avg Speed", f"{avg_speed} km/h", "+5 km/h", True, "primary")
+    
+    with col4:
+        delayed = len(df[df['alert_level'] == 'warning']) if not df.empty else 0
+        render_metric_card("Delayed", delayed, "-2", True, "warning")
+    
+    with col5:
+        critical = len(df[df['alert_level'] == 'critical']) if not df.empty else 0
+        render_metric_card("Critical", critical, "Attention", False, "danger")
+    
+    # Main Layout
+    map_col, data_col = st.columns([2, 1])
+    
+    with map_col:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">🗺️ Live Fleet Map</div>', unsafe_allow_html=True)
+        
         if not df.empty and pdk:
-            # Route Lines (Colored Teal Light)
-            routes = [{"path": [[r['source_lon'], r['source_lat']], [r['dest_lon'], r['dest_lat']]]} for _, r in df.iterrows() if pd.notnull(r.get('source_lon'))]
-            path_layer = pdk.Layer("PathLayer", data=routes, get_path="path", get_color=[130, 180, 185, 150], get_width=3)
+            color_map = {
+                'on_time': [0, 196, 140, 200],
+                'warning': [255, 165, 0, 200],
+                'critical': [255, 71, 87, 200]
+            }
             
-            # Vehicle Dots (Colored Teal Dark)
-            vehicle_layer = pdk.Layer("ScatterplotLayer", data=df, get_position='[lon, lat]', get_color=[18, 94, 110, 200], get_radius=25000, pickable=True)
+            # Routes
+            routes = []
+            for _, r in df.iterrows():
+                if pd.notnull(r.get('source_lon')):
+                    routes.append({
+                        'path': [[r['source_lon'], r['source_lat']], [r['dest_lon'], r['dest_lat']]],
+                        'color': color_map.get(r.get('alert_level', 'on_time'), [130, 180, 185, 150]),
+                        'width': 5 if r.get('alert_level') == 'critical' else 3
+                    })
             
-            st.pydeck_chart(pdk.Deck(layers=[path_layer, vehicle_layer], initial_view_state=pdk.ViewState(latitude=21.0, longitude=78.0, zoom=3.5), tooltip={"html": "<b>ID: {shipment_id}</b><br>Speed: {avg_speed} km/h"}, map_style='light'), use_container_width=True)
+            path_layer = pdk.Layer(
+                "PathLayer",
+                data=routes,
+                get_path="path",
+                get_color="color",
+                get_width="width",
+                width_scale=1000,
+                width_min_pixels=2
+            )
+            
+            # Vehicles
+            vehicles = df.copy()
+            vehicles['color'] = vehicles['alert_level'].map(color_map)
+            vehicles['radius'] = vehicles['alert_level'].apply(
+                lambda x: 35000 if x == 'critical' else 28000
+            )
+            
+            vehicle_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=vehicles,
+                get_position='[lon, lat]',
+                get_color='color',
+                get_radius='radius',
+                pickable=True,
+                opacity=0.9
+            )
+            
+            st.pydeck_chart(
+                pdk.Deck(
+                    layers=[path_layer, vehicle_layer],
+                    initial_view_state=pdk.ViewState(
+                        latitude=21.0,
+                        longitude=78.0,
+                        zoom=3.5,
+                        pitch=0
+                    ),
+                    tooltip={
+                        "html": "<b>{shipment_id}</b><br>{source} → {destination}<br>Speed: {avg_speed} km/h<br>ETA: {predicted_eta} min",
+                        "style": {
+                            "backgroundColor": "#141B3D",
+                            "color": "white",
+                            "border": "1px solid #2D3748",
+                            "borderRadius": "8px",
+                            "padding": "12px"
+                        }
+                    },
+                    map_style='mapbox://styles/mapbox/dark-v10'
+                ),
+                use_container_width=True
+            )
         else:
             st.info("📡 Waiting for GPS data...")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Smart Inspector (Anomaly UI)
-    with col_details:
-        st.markdown("### 📦 AI Inspector")
+    with data_col:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">📋 Active Shipments</div>', unsafe_allow_html=True)
+        
         if not df.empty:
-            sid = st.selectbox("Select Shipment ID", df['shipment_id'].unique(), label_visibility="collapsed")
-            row = df[df['shipment_id'] == sid].iloc[0]
-            
-            badge = "badge-critical" if row.get('alert_level') in ['warning', 'critical'] else "badge-ontime"
-            temp_color = "var(--danger)" if row.get('temperature', 0) > -5 else "var(--teal-mid)"
-            
-            # Anomaly & Delay UI Logic
-            reason_html = ""
-            if row.get('delay_reason'):
-                border_color = "var(--danger)" if row.get('alert_level') == 'critical' else "var(--teal-mid)"
-                text_color = "var(--danger)" if row.get('alert_level') == 'critical' else "var(--teal-dark)"
+            for _, row in df.head(8).iterrows():
+                status_class = f"status-{row['alert_level'].replace('_', '-')}" if row['alert_level'] != 'on_time' else "status-success"
+                progress = row.get('progress', 50)
                 
-                reason_html = textwrap.dedent(f"""
-                <div class="reason-box" style="border-left: 5px solid {border_color};">
-                    <strong style="color:{text_color};">⚠️ ETA Delay Insight:</strong><br>
-                    <span style="color:var(--text-muted); font-size: 0.95rem;">{row['delay_reason']}</span>
+                st.markdown(f'''
+                <div style="background: var(--surface-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 700; color: var(--text-primary) !important;">{row['shipment_id']}</span>
+                        <span class="status-pill {status_class}">{row['alert_level'].replace('_', ' ').title()}</span>
+                    </div>
+                    <div style="font-size: 0.8125rem; color: var(--text-secondary) !important; margin-bottom: 0.5rem;">
+                        📍 {row['source']} → {row['destination']}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted) !important; margin-bottom: 0.5rem;">
+                        <span>ETA: {int(row['predicted_eta'])} min</span>
+                        <span>{row['avg_speed']:.0f} km/h</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {progress}%; background: {'var(--success)' if row['alert_level'] == 'on_time' else 'var(--warning)' if row['alert_level'] == 'warning' else 'var(--danger)'};"></div>
+                    </div>
                 </div>
-                """).strip()
+                ''', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            # Additional metrics
-            confidence_color = "var(--teal-mid)" if row.get('confidence', 0) > 80 else "var(--text-muted)"
-            
-            card_html = textwrap.dedent(f"""
-            <div class="dashboard-card">
-                <div style="margin-bottom:1rem;"><small style="color:var(--text-muted) !important;">{row.get('source', 'N/A')} → {row.get('destination', 'N/A')}</small></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>Status</span><span class="badge {badge}">{row.get('alert_level', 'N/A').replace('_', ' ')}</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>Current Speed</span><span style="font-weight:700;">{row.get('avg_speed', 0):.1f} km/h</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>Distance Left</span><span style="font-weight:700;">{row.get('distance_km', 0):.1f} km</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>ETA Prediction</span><span style="font-weight:700;">{row.get('predicted_eta', 'N/A')} mins</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>Confidence</span><span style="font-weight:700; color:{confidence_color} !important;">{row.get('confidence', 0):.1f}%</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>Cargo Temp</span><span style="font-weight:800; font-size:1.2rem; color:{temp_color} !important;">{row.get('temperature', 'N/A')}°C</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;"><span>Load Status</span><span style="font-weight:700;">{row.get('load_status', 'N/A')}</span></div>
-                {reason_html}
-            </div>
-            """).strip()
-            
-            st.markdown(card_html, unsafe_allow_html=True)
-
-
-# ==========================================
-# TAB 2: RAG CHATBOT (MEMBER 4)
-# ==========================================
-with tab_chat:
-    st.markdown("### 🤖 Logistics Copilot")
-    st.markdown("<small style='color:var(--text-muted) !important;'>Ask questions about supply chain documents, routing policies, or live fleet status.</small>", unsafe_allow_html=True)
-    st.write("") # Spacer
+elif view_mode == "Analytics":
+    # Analytics View
+    col1, col2 = st.columns(2)
     
-    # Initialize Chat History
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Hello! I am your RAG-powered Logistics Copilot. How can I assist you today?"}]
+    with col1:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">📊 Performance Metrics</div>', unsafe_allow_html=True)
+        
+        if not df.empty:
+            # Speed Distribution
+            fig = px.histogram(
+                df,
+                x='avg_speed',
+                nbins=20,
+                title="Speed Distribution",
+                labels={'avg_speed': 'Speed (km/h)'},
+                color_discrete_sequence=['#0066FF']
+            )
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#A0AEC0'),
+                title_font=dict(size=14, color='#FFFFFF'),
+                height=300
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">🎯 Status Overview</div>', unsafe_allow_html=True)
+        
+        if not df.empty:
+            status_counts = df['alert_level'].value_counts()
+            fig = go.Figure(data=[go.Pie(
+                labels=status_counts.index,
+                values=status_counts.values,
+                marker=dict(colors=['#00C48C', '#FFA500', '#FF4757']),
+                hole=0.5
+            )])
+            fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#A0AEC0'),
+                height=300,
+                showlegend=True
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Detailed Table
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">📋 Shipment Details</div>', unsafe_allow_html=True)
+    
+    if not df.empty:
+        display_df = df[['shipment_id', 'source', 'destination', 'avg_speed', 'predicted_eta', 'distance_km', 'alert_level', 'confidence']].copy()
+        display_df.columns = ['ID', 'Origin', 'Destination', 'Speed (km/h)', 'ETA (min)', 'Distance (km)', 'Status', 'Confidence (%)']
+        st.dataframe(display_df, use_container_width=True, height=400)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Display Chat History (Removed HTML Wrappers)
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Chat Input Trigger
-    if prompt := st.chat_input("Ask about weather delays, policy documents, or specific trucks..."):
-        # Add User Message
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Generate & Add Bot Response
-        with st.chat_message("assistant"):
-            with st.spinner("Searching knowledge base..."):
-                response = generate_rag_response(prompt, df) 
-                st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+else:  # Operations view with AI Assistant
+    chat_col, ops_col = st.columns([1.5, 1])
+    
+    with chat_col:
+        st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
+        st.markdown('''
+        <div class="chat-header">
+            <div class="panel-title">🤖 AI Operations Assistant</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary) !important; margin-top: 0.5rem;">
+                Ask me anything about fleet operations, delays, or logistics
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
+        
+        if "messages" not in st.session_state:
+            st.session_state.messages = [{
+                "role": "assistant",
+                "content": "👋 Hello! I'm your AI Operations Assistant. I can help you analyze fleet performance, identify delays, and provide operational insights. What would you like to know?"
+            }]
+        
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if prompt := st.chat_input("Ask about your fleet operations..."):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing..."):
+                    response = generate_rag_response(prompt, df)
+                    st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with ops_col:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">⚡ Quick Actions</div>', unsafe_allow_html=True)
+        
+        if st.button("📊 Fleet Status Summary", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "Give me a complete fleet status summary"})
+            st.rerun()
+        
+        if st.button("⚠️ Show Critical Issues", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "What are the critical issues right now?"})
+            st.rerun()
+        
+        if st.button("📈 Performance Analysis", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "Analyze overall fleet performance"})
+            st.rerun()
+        
+        if st.button("🚨 Delayed Shipments", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "Show me all delayed shipments"})
+            st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Recent Alerts
+        st.markdown('<div class="panel" style="margin-top: 1.5rem;">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">🚨 Recent Alerts</div>', unsafe_allow_html=True)
+        
+        if not df.empty:
+            critical_shipments = df[df['alert_level'] == 'critical']
+            for _, row in critical_shipments.head(5).iterrows():
+                st.markdown(f'''
+                <div class="alert-item">
+                    <div class="alert-time">{datetime.now().strftime("%H:%M:%S")}</div>
+                    <div class="alert-message">
+                        <b>{row['shipment_id']}</b> - Delayed by {int(row['predicted_eta'] - 180)} min
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
