@@ -5,8 +5,18 @@ from .stall_detector import check_shipment_stall
 from .driver_alerts import create_driver_alert
 from fastapi import HTTPException
 import traceback
+from fastapi.middleware.cors import CORSMiddleware
 from .db import get_conn
 app = FastAPI(title="AI Alert Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/health/db")
 def health_db():
     try:

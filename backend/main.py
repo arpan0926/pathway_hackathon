@@ -49,16 +49,26 @@ socket_app = socketio.ASGIApp(sio, app)
 async def connect(sid, environ):
     print(f"Client connected: {sid}")
 
-@sio.event  
+@sio.event
+async def connect(sid, environ):
+    print(f"🔌 Client connected: {sid}")
+
+@sio.event
 async def disconnect(sid):
-    print(f"Client disconnected: {sid}")
+    print(f"🔌 Client disconnected: {sid}")
+
 
 # Function to broadcast telemetry (call from your GPS route handlers)
 async def broadcast_telemetry(data: dict):
     await sio.emit('telemetry_update', data)
 
-async def broadcast_alert(alert: dict):
-    await sio.emit('new_alert', alert)
+# Function to broadcast alerts (called by driver_safety.py or other services)
+async def broadcast_alert(alert_data: dict):
+    """Broadcast new alert to all connected clients"""
+    await sio.emit('new_alert', alert_data)
+    print(f"📡 Alert broadcasted: {alert_data['alert_type']}")
+
+
 
 
 

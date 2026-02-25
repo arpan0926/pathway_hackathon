@@ -162,6 +162,7 @@ export const ShipmentMap = () => {
               geometry: { type: 'LineString', coordinates: coords },
               properties: {},
             }}
+            lineMetrics={true}
           >
             <Layer
               id={`route-line-${shipId}`}
@@ -188,6 +189,7 @@ export const ShipmentMap = () => {
                 geometry: { type: 'LineString', coordinates: coords },
                 properties: {},
               }}
+              lineMetrics={true}
             >
               <Layer
                 id={`trail-line-${shipId}`}

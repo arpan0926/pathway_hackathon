@@ -39,7 +39,7 @@ export const SpeedChart = () => {
         Fleet Speed (km/h)
       </Typography>
 
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={340}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1E1E2E" />
           <XAxis

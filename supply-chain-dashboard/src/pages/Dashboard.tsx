@@ -1,12 +1,11 @@
-import {  Box, Typography } from '@mui/material';
-import Grid from '@mui/material/Grid';
-
+import { Grid, Box, Typography } from '@mui/material';
 import { useStats } from '../hooks/useShipments';
-import { ShipmentMap } from '../components/map/shipmentMap';
+import { ShipmentMap } from '../components/map/shipmentMap'
 import { AlertsFeed } from '../components/alerts/AlertsFeed';
 import { SpeedChart } from '../components/dashboard/SpeedChart';
 import { ETAChart } from '../components/dashboard/ETAChart';
-import { DriverSafetyMonitor } from '../components/dashboard/DriverSafetyMonitor';
+import { DriverSafetyMonitor } from '../components/dashboard/DriverSafetyMonitor';  // ← ADD THIS
+import { AIAlertsPanel } from '../components/dashboard/aiAlertsPanel';  // ← ADD THIS
 
 export const Dashboard = () => {
   const { data: stats } = useStats();
@@ -23,14 +22,14 @@ export const Dashboard = () => {
       {/* KPI Row */}
       <Grid container spacing={2} mb={3}>
         {kpis.map((kpi) => (
-            <Grid key={kpi.label} size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={kpi.label}>
             <Box sx={{
               background: '#111120', border: `1px solid ${kpi.color}30`,
               borderRadius: 2, p: 2.5,
               borderLeft: `3px solid ${kpi.color}`,
             }}>
               <Typography variant="caption" color="text.secondary">{kpi.label}</Typography>
-              <Typography variant="h4" sx={{ color: kpi.color, fontWeight: 700, mt: 0.5 }}>
+              <Typography variant="h4" sx={{ color: kpi.color, fontWeight: 600, mt: 0.5 }}>
                 {kpi.value}
               </Typography>
             </Box>
@@ -47,23 +46,32 @@ export const Dashboard = () => {
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <Box sx={{ height: 420, background: '#111120', borderRadius: 2, overflow: 'hidden', border: '1px solid #1E1E2E' }}>
-            <AlertsFeed />
+            <AIAlertsPanel/>
           </Box>
         </Grid>
       </Grid>
+      
 
-      {/* Charts row */}
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <SpeedChart />
+      {/* ADD THIS NEW ROW - Driver Safety + Charts */}
+      <Grid container spacing={2} mb={2}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <DriverSafetyMonitor />
         </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12 }}>
+              <SpeedChart />
+            </Grid>
+          </Grid>
+        </Grid>
+      </Grid>
+
+      {/* ETA Chart row */}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12 }}>
           <ETAChart />
         </Grid>
       </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
-  <DriverSafetyMonitor />
-</Grid>
     </Box>
   );
 };
