@@ -1,1 +1,0 @@
-# GenAI and RAG configuration

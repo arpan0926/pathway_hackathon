@@ -16,26 +16,93 @@ build/
 .idea/
 *.swp
 *.swo
+*.code-workspace
 
 # Environment
 .env
 .env.local
+.env.*.local
 
-# Data
-*.csv
-*.json
+# Data - exclude all generated data
 *.log
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/*.csv
+data/*.json
 
-# Outputs
+# Outputs - exclude all generated outputs
 outputs/*
 !outputs/.gitkeep
 logs/*
 !logs/.gitkeep
 
+# Pathway pipeline generated files
+pathway_pipeline/data/*.csv
+pathway_pipeline/outputs/*.csv
+pathway_pipeline/*.csv
+pathway_pipeline/venv/
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+docker-compose.override.yml
+
 # OS
 .DS_Store
 Thumbs.db
+*.swp
+*~
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Test files
+test_*.py
+check_*.py
+*_test.py
+*_mock.py
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+
+# Node.js (for React dashboard)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+.cache/
+
+# React specific
+.env.development.local
+.env.test.local
+.env.production.local
+.vite/
+
+# Coverage
+coverage/
+*.coverage
+.nyc_output/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Deprecated/unused folders
+dashboard/                    # Old Streamlit dashboard (replaced by supply-chain-dashboard/)
+npm-cache/                    # Temporary npm cache
+site-packages/                # Python packages (should be in venv)
+
+# Root-level node files (React dashboard has its own in supply-chain-dashboard/)
+/node_modules/
+/package.json
+/package-lock.json

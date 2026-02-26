@@ -1,4 +1,6 @@
-pathway==0.8.0
-pandas==2.2.0
-numpy==1.26.3
-geopy==2.4.1
+pathway
+pandas
+numpy
+geopy
+psycopg2-binary
+python-dotenv

@@ -1,0 +1,165 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    
+    environment:
+      POSTGRES_DB: supply_chain_db
+      POSTGRES_USER: supply_chain_user
+      POSTGRES_PASSWORD: supply_chain_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - supply-chain-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supply_chain_user -d supply_chain_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Member 2: GPS Simulator
+  gps-simulator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gps_simulator
+    environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./shared:/app/shared
+    command: python gps_simulator.py
+    networks:
+      - supply-chain-network
+    restart: unless-stopped
+
+  # Member 1: Pathway Pipeline
+  pathway-pipeline:
+    build:
+      context: ./pathway_pipeline
+      dockerfile: Dockerfile
+    container_name: pathway_pipeline
+    environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./pathway_pipeline:/app
+      - ./shared:/app/shared
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    command: sh -c "python postgres_to_csv_bridge.py & python pipeline.py"
+    networks:
+      - supply-chain-network
+    restart: unless-stopped
+
+  # Member 2: Backend API
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend_api
+    environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./shared:/app/shared
+    command: uvicorn main:socket_app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - supply-chain-network
+    restart: unless-stopped
+
+  # Member 4: GenAI RAG Chatbot API
+  chatbot:
+    build:
+      context: ./genai_rag
+      dockerfile: Dockerfile
+    container_name: chatbot
+    environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./genai_rag:/app
+      - ./shared:/app/shared
+    command: uvicorn rag_api:app --host 0.0.0.0 --port 8001 --reload
+    networks:
+      - supply-chain-network
+    restart: unless-stopped
+  # AI Alert Microservice (New)
+  ai-alert-service:
+    build:
+      context: ./ai_alert_service
+      dockerfile: Dockerfile
+    container_name: ai_alert_service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: supply_chain_db
+      DB_USER: supply_chain_user
+      DB_PASS: supply_chain_pass
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./ai_alert_service:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+    networks:
+      - supply-chain-network
+    restart: unless-stopped  
+    
+  driver-safety:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: driver_safety
+    environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+      BACKEND_URL: http://backend-api:8000
+      AI_ALERTS_URL: http://ai-alert-service:8100
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./shared:/app/shared
+    command: python driver_safety.py
+    networks:
+      - supply-chain-network
+    restart: unless-stopped
+    
+
+  
+
+networks:
+  supply-chain-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+
+   
+  

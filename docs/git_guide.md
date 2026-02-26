@@ -4,8 +4,8 @@
 
 ### 1. Clone the Repository
 ```bash
-git clone <repository-url>
-cd supply-chain-tracker
+git clone https://github.com/AYUSH-0305/pathway_hackathon.git
+cd pathway_hackathon
 ```
 
 ### 2. Switch to Development Branch
@@ -19,12 +19,21 @@ git branch
 # You should see: * development
 ```
 
-## Daily Workflow - Pushing Your Changes
+## Daily Workflow - Feature Branch & Pull Requests
 
-### Step 1: Check Current Branch
+### Step 1: Create Your Feature Branch
 ```bash
-git branch
-# Make sure you see: * development
+# Make sure you're on development
+git checkout development
+git pull origin development
+
+# Create your feature branch
+# Use format: memberX/feature-name
+git checkout -b member1/eta-calculation
+# or
+git checkout -b member2/gps-simulator
+# or
+git checkout -b member3/dashboard-updates
 ```
 
 ### Step 2: Check What Files You Changed
@@ -54,37 +63,68 @@ git commit -m "Created dashboard map component"
 git commit -m "Fixed alert logic bug"
 ```
 
-### Step 5: Pull Latest Changes (Important!)
+### Step 5: Push Your Feature Branch
 ```bash
-# Always pull before pushing to avoid conflicts
-git pull origin development
+# Push to YOUR branch (not development!)
+git push origin member1/eta-calculation
 ```
 
-### Step 6: Push Your Changes
+### Step 6: Create Pull Request on GitHub
+1. Go to https://github.com/AYUSH-0305/pathway_hackathon
+2. Click "Pull requests" tab
+3. Click "New pull request"
+4. **Base**: `development`
+5. **Compare**: `member1/eta-calculation` (your branch)
+6. Click "Create pull request"
+7. Add title and description
+8. Assign AYUSH as reviewer
+9. Click "Create pull request"
+
+### Step 7: Wait for Approval
+- AYUSH will review your code
+- He may request changes
+- Once approved, he will merge it
+- You'll get a notification
+
+### Step 8: After Merge - Update Your Local
 ```bash
-git push origin development
+# Switch back to development
+git checkout development
+
+# Pull the merged changes
+git pull origin development
+
+# Delete your old feature branch (optional)
+git branch -d member1/eta-calculation
 ```
 
 ## Complete Example
 
 ```bash
-# 1. Make sure you're on development branch
+# 1. Start from development branch
 git checkout development
-
-# 2. Check what you changed
-git status
-
-# 3. Add your changes
-git add .
-
-# 4. Commit with a message
-git commit -m "Implemented GPS simulator with route generation"
-
-# 5. Pull latest changes from team
 git pull origin development
 
-# 6. Push your changes
-git push origin development
+# 2. Create your feature branch
+git checkout -b member2/gps-simulator
+
+# 3. Make your changes, then check status
+git status
+
+# 4. Add your changes
+git add .
+
+# 5. Commit with a message
+git commit -m "Implemented GPS simulator with route generation"
+
+# 6. Push to YOUR branch
+git push origin member2/gps-simulator
+
+# 7. Go to GitHub and create Pull Request
+# 8. Wait for AYUSH to review and approve
+# 9. After merge, update your local development
+git checkout development
+git pull origin development
 ```
 
 ## Handling Merge Conflicts
