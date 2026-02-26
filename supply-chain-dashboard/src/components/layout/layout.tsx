@@ -1,5 +1,4 @@
 import { Box } from '@mui/material';
-
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { useStore } from '../../store/useStore';

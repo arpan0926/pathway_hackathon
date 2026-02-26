@@ -20,7 +20,9 @@ print()
 # Destination coordinates (from shared/schemas.py)
 DESTINATIONS = {
     "SH001": {"name": "Delhi", "lat": 28.6139, "lon": 77.2090},
-    "SH002": {"name": "Chennai", "lat": 13.0827, "lon": 80.2707}
+    "SH002": {"name": "Chennai", "lat": 13.0827, "lon": 80.2707},
+    "SH003": {"name": "Hyderabad", "lat": 17.3850, "lon": 78.4867},
+    "SH004": {"name": "Ahmedabad", "lat": 23.0225, "lon": 72.5714},
 }
 
 def haversine_distance(lat1, lon1, lat2, lon2):

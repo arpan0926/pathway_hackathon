@@ -11,6 +11,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 // Exact route waypoints from gps_simulator.py
+// Exact route waypoints from gps_simulator.py
 const ROUTE_WAYPOINTS: Record<string, [number, number][]> = {
   SH001: [
     [72.8777, 19.0760],  // Mumbai
@@ -24,21 +25,42 @@ const ROUTE_WAYPOINTS: Record<string, [number, number][]> = {
     [78.1182, 12.8406],  // Waypoint
     [80.2707, 13.0827],  // Chennai
   ],
+  SH003: [
+    [88.3639, 22.5726],  // Kolkata
+    [79.0882, 21.1458],  // Nagpur
+    [79.0882, 19.0760],  // Waypoint
+    [78.4867, 17.3850],  // Hyderabad
+  ],
+  SH004: [
+    [73.8567, 18.5204],  // Pune
+    [73.7898, 19.9975],  // Nashik
+    [72.8311, 21.1702],  // Surat
+    [72.5714, 23.0225],  // Ahmedabad
+  ],
 };
 
 const SHIPMENT_CONFIG: Record<string, { color: string; label: string; route: string }> = {
-  SH001: { color: '#00E5FF', label: 'Mumbai → Delhi',     route: 'VH001' },
-  SH002: { color: '#FF6B35', label: 'Bangalore → Chennai', route: 'VH002' },
+  SH001: { color: '#00E5FF', label: 'Mumbai → Delhi',       route: 'VH001' },
+  SH002: { color: '#FF6B35', label: 'Bangalore → Chennai',  route: 'VH002' },
+  SH003: { color: '#A8FF3E', label: 'Kolkata → Hyderabad',  route: 'VH003' },
+  SH004: { color: '#FFB300', label: 'Pune → Ahmedabad',     route: 'VH004' },
 };
 
-// City labels for waypoints
+// Add new cities to the CITIES array
 const CITIES: { name: string; lon: number; lat: number }[] = [
-  { name: 'Mumbai',    lon: 72.8777, lat: 19.0760 },
-  { name: 'Delhi',     lon: 77.2090, lat: 28.6139 },
-  { name: 'Bangalore', lon: 77.5946, lat: 12.9716 },
-  { name: 'Chennai',   lon: 80.2707, lat: 13.0827 },
-  { name: 'Bhopal',    lon: 77.4126, lat: 23.2599 },
-  { name: 'Jaipur',    lon: 75.7873, lat: 26.9124 },
+  { name: 'Mumbai',     lon: 72.8777, lat: 19.0760 },
+  { name: 'Delhi',      lon: 77.2090, lat: 28.6139 },
+  { name: 'Bangalore',  lon: 77.5946, lat: 12.9716 },
+  { name: 'Chennai',    lon: 80.2707, lat: 13.0827 },
+  { name: 'Kolkata',    lon: 88.3639, lat: 22.5726 },
+  { name: 'Hyderabad',  lon: 78.4867, lat: 17.3850 },
+  { name: 'Pune',       lon: 73.8567, lat: 18.5204 },
+  { name: 'Ahmedabad',  lon: 72.5714, lat: 23.0225 },
+  { name: 'Bhopal',     lon: 77.4126, lat: 23.2599 },
+  { name: 'Jaipur',     lon: 75.7873, lat: 26.9124 },
+  { name: 'Nagpur',     lon: 79.0882, lat: 21.1458 },
+  { name: 'Nashik',     lon: 73.7898, lat: 19.9975 },
+  { name: 'Surat',      lon: 72.8311, lat: 21.1702 },
 ];
 
 interface LivePosition {
@@ -60,34 +82,97 @@ export const ShipmentMap = () => {
   const { setSelectedShipment, updatePosition } = useStore();
 
   // Poll latest telemetry for each shipment every 2 seconds
-  const { data: sh001 } = useQuery({
-    queryKey: ['live-telemetry', 'SH001'],
-    queryFn: () => telemetryApi.getLatest('SH001').then(r => r.data),
-    refetchInterval: 2000,
-    retry: false,
-  });
+// Poll latest telemetry for all 4 shipments
+const { data: sh001 } = useQuery({
+  queryKey: ['live-telemetry', 'SH001'],
+  queryFn: () => telemetryApi.getLatest('SH001').then(r => r.data),
+  refetchInterval: 2000,
+  retry: false,
+});
 
-  const { data: sh002 } = useQuery({
-    queryKey: ['live-telemetry', 'SH002'],
-    queryFn: () => telemetryApi.getLatest('SH002').then(r => r.data),
-    refetchInterval: 2000,
-    retry: false,
-  });
+const { data: sh002 } = useQuery({
+  queryKey: ['live-telemetry', 'SH002'],
+  queryFn: () => telemetryApi.getLatest('SH002').then(r => r.data),
+  refetchInterval: 2000,
+  retry: false,
+});
 
-  // Also get trail (last 30 points) for each shipment
-  const { data: trail001 } = useQuery({
-    queryKey: ['trail', 'SH001'],
-    queryFn: () => telemetryApi.getAll('SH001', 30).then(r => r.data),
-    refetchInterval: 4000,
-    retry: false,
-  });
+const { data: sh003 } = useQuery({
+  queryKey: ['live-telemetry', 'SH003'],
+  queryFn: () => telemetryApi.getLatest('SH003').then(r => r.data),
+  refetchInterval: 2000,
+  retry: false,
+});
 
-  const { data: trail002 } = useQuery({
-    queryKey: ['trail', 'SH002'],
-    queryFn: () => telemetryApi.getAll('SH002', 30).then(r => r.data),
-    refetchInterval: 4000,
-    retry: false,
-  });
+const { data: sh004 } = useQuery({
+  queryKey: ['live-telemetry', 'SH004'],
+  queryFn: () => telemetryApi.getLatest('SH004').then(r => r.data),
+  refetchInterval: 2000,
+  retry: false,
+});
+
+// Get trails for all 4
+const { data: trail001 } = useQuery({
+  queryKey: ['trail', 'SH001'],
+  queryFn: () => telemetryApi.getAll('SH001', 30).then(r => r.data),
+  refetchInterval: 4000,
+  retry: false,
+});
+
+const { data: trail002 } = useQuery({
+  queryKey: ['trail', 'SH002'],
+  queryFn: () => telemetryApi.getAll('SH002', 30).then(r => r.data),
+  refetchInterval: 4000,
+  retry: false,
+});
+
+const { data: trail003 } = useQuery({
+  queryKey: ['trail', 'SH003'],
+  queryFn: () => telemetryApi.getAll('SH003', 30).then(r => r.data),
+  refetchInterval: 4000,
+  retry: false,
+});
+
+const { data: trail004 } = useQuery({
+  queryKey: ['trail', 'SH004'],
+  queryFn: () => telemetryApi.getAll('SH004', 30).then(r => r.data),
+  refetchInterval: 4000,
+  retry: false,
+});
+
+// Update positions when data arrives (add sh003 and sh004)
+useEffect(() => {
+  if (sh003) {
+    setPositions(prev => ({ ...prev, SH003: sh003 }));
+    updatePosition('SH003', sh003);
+    setPulseStates(prev => ({ ...prev, SH003: true }));
+    setTimeout(() => setPulseStates(prev => ({ ...prev, SH003: false })), 600);
+  }
+}, [sh003]);
+
+useEffect(() => {
+  if (sh004) {
+    setPositions(prev => ({ ...prev, SH004: sh004 }));
+    updatePosition('SH004', sh004);
+    setPulseStates(prev => ({ ...prev, SH004: true }));
+    setTimeout(() => setPulseStates(prev => ({ ...prev, SH004: false })), 600);
+  }
+}, [sh004]);
+
+// Build trails (add sh003 and sh004)
+useEffect(() => {
+  if (trail003 && trail003.length > 0) {
+    const coords: [number, number][] = trail003.slice().reverse().map(t => [t.lon, t.lat]);
+    setTrails(prev => ({ ...prev, SH003: coords }));
+  }
+}, [trail003]);
+
+useEffect(() => {
+  if (trail004 && trail004.length > 0) {
+    const coords: [number, number][] = trail004.slice().reverse().map(t => [t.lon, t.lat]);
+    setTrails(prev => ({ ...prev, SH004: coords }));
+  }
+}, [trail004]);
 
   // Update positions when data arrives
   useEffect(() => {

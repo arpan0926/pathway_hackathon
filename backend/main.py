@@ -14,9 +14,10 @@ import os
 import socketio
 from groq import Groq
 
-
+from dotenv import load_dotenv
+load_dotenv()
 # Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://supply_chain_user:supply_chain_pass@localhost:5432/supply_chain_db")
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
@@ -45,6 +46,7 @@ app.add_middleware(
 socket_app = socketio.ASGIApp(sio, app)
 
 # Socket events
+
 @sio.event
 async def connect(sid, environ):
     print(f"Client connected: {sid}")
@@ -56,6 +58,11 @@ async def connect(sid, environ):
 @sio.event
 async def disconnect(sid):
     print(f"🔌 Client disconnected: {sid}")
+
+@sio.on('new_alert')
+async def handle_new_alert(sid, data):
+    print(f"🔄 Relaying alert to React Dashboard: {data.get('alert_type')}")
+    await sio.emit('new_alert', data, skip_sid=sid)
 
 
 # Function to broadcast telemetry (call from your GPS route handlers)

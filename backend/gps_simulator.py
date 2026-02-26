@@ -65,7 +65,7 @@ class RealisticGPSSimulator:
         return (lat, lon, self.speed)
 
 
-# Routes with exact waypoints matching the frontend map
+# Routes with 4 different shipments
 ROUTES = {
     ("Mumbai", "Delhi"): [
         (19.0760, 72.8777),  # Mumbai
@@ -79,6 +79,18 @@ ROUTES = {
         (12.8406, 78.1182),  # Waypoint
         (13.0827, 80.2707),  # Chennai
     ],
+    ("Kolkata", "Hyderabad"): [
+        (22.5726, 88.3639),  # Kolkata
+        (21.1458, 79.0882),  # Nagpur
+        (19.0760, 79.0882),  # Waypoint
+        (17.3850, 78.4867),  # Hyderabad
+    ],
+    ("Pune", "Ahmedabad"): [
+        (18.5204, 73.8567),  # Pune
+        (19.9975, 73.7898),  # Nashik
+        (21.1702, 72.8311),  # Surat
+        (23.0225, 72.5714),  # Ahmedabad
+    ],
 }
 
 
@@ -91,7 +103,7 @@ def get_db_connection():
 
 
 def ensure_shipments_exist():
-    """Make sure SH001 and SH002 exist in shipments table"""
+    """Make sure all 4 shipments exist in shipments table"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -99,13 +111,15 @@ def ensure_shipments_exist():
             INSERT INTO shipments (shipment_id, vehicle_id, source, destination, status, last_updated)
             VALUES
                 ('SH001', 'VH001', 'Mumbai', 'Delhi', 'IN_TRANSIT', NOW()),
-                ('SH002', 'VH002', 'Bangalore', 'Chennai', 'IN_TRANSIT', NOW())
+                ('SH002', 'VH002', 'Bangalore', 'Chennai', 'IN_TRANSIT', NOW()),
+                ('SH003', 'VH003', 'Kolkata', 'Hyderabad', 'IN_TRANSIT', NOW()),
+                ('SH004', 'VH004', 'Pune', 'Ahmedabad', 'IN_TRANSIT', NOW())
             ON CONFLICT (shipment_id) DO UPDATE
                 SET status = 'IN_TRANSIT', last_updated = NOW();
         """)
         conn.commit()
         conn.close()
-        print("✅ Shipments SH001 and SH002 ready in DB")
+        print("✅ All 4 shipments ready in DB")
     except Exception as e:
         print(f"⚠️  Could not ensure shipments: {e}")
 
@@ -115,13 +129,11 @@ def insert_telemetry(shipment_id, vehicle_id, lat, lon, speed, load_status):
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Insert telemetry
         cur.execute("""
             INSERT INTO telemetry (shipment_id, vehicle_id, ts, lat, lon, speed_kmph, load_status)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (shipment_id, vehicle_id, datetime.now(), lat, lon, speed, load_status))
 
-        # Update shipment last_updated and current position
         cur.execute("""
             UPDATE shipments
             SET last_updated = NOW(), status = 'IN_TRANSIT'
@@ -151,7 +163,6 @@ def run_simulation(shipment_id, origin, destination, vehicle_id):
     while True:
         result = sim.get_next_position()
         if result is None:
-            print(f"✅ {shipment_id} completed route, restarting...")
             sim.current_segment = 0
             sim.segment_progress = 0.0
             continue
@@ -163,10 +174,10 @@ def run_simulation(shipment_id, origin, destination, vehicle_id):
 
 
 if __name__ == "__main__":
-    print("\n🚀 Starting GPS Simulator — Both Shipments in Parallel")
+    print("\n🚀 Starting GPS Simulator — 4 Shipments in Parallel")
     print("=" * 60)
 
-    # Wait for DB to be ready
+    # Wait for DB
     print("⏳ Waiting for database...")
     for attempt in range(10):
         try:
@@ -180,23 +191,19 @@ if __name__ == "__main__":
 
     ensure_shipments_exist()
 
-    # Run BOTH shipments in parallel threads
-    t1 = threading.Thread(
-        target=run_simulation,
-        args=("SH001", "Mumbai", "Delhi", "VH001"),
-        daemon=True
-    )
-    t2 = threading.Thread(
-        target=run_simulation,
-        args=("SH002", "Bangalore", "Chennai", "VH002"),
-        daemon=True
-    )
+    # Run ALL 4 shipments in parallel threads
+    threads = [
+        threading.Thread(target=run_simulation, args=("SH001", "Mumbai", "Delhi", "VH001"), daemon=True),
+        threading.Thread(target=run_simulation, args=("SH002", "Bangalore", "Chennai", "VH002"), daemon=True),
+        threading.Thread(target=run_simulation, args=("SH003", "Kolkata", "Hyderabad", "VH003"), daemon=True),
+        threading.Thread(target=run_simulation, args=("SH004", "Pune", "Ahmedabad", "VH004"), daemon=True),
+    ]
 
-    t1.start()
-    time.sleep(1)  # Stagger starts slightly
-    t2.start()
+    for i, t in enumerate(threads):
+        t.start()
+        time.sleep(0.5)  # Stagger starts
 
-    print("\n✅ Both simulators running! Press Ctrl+C to stop.\n")
+    print("\n✅ All 4 simulators running! Press Ctrl+C to stop.\n")
 
     try:
         while True:

@@ -1,0 +1,186 @@
+/* ==================================================
+   Fresh light-themed dashboard styles (Streamlit-safe)
+   - Scoped under .dashboard-card and a few safe helpers
+   - Focus: clear spacing, top-aligned columns, readable metrics
+   - Keep selectors conservative to avoid clashing with Streamlit internals
+   ================================================== */
+
+:root{
+  --bg: #0b1220; /* page background */
+  --panel: #0f1724; /* card surface */
+  --muted: #9aa4b2; /* subdued text */
+  --accent: #60a5fa; /* primary light blue */
+  --accent-2: #34d399; /* teal accent */
+  --danger: #fb7185;
+  --warning: #f59e0b;
+  --success: #34d399;
+  --shadow: 0 8px 30px rgba(2,6,23,0.6);
+  --radius: 12px;
+}
+
+/* Light background for the main content area (non-invasive) */
+body, .main {
+  background-color: var(--bg) !important;
+}
+/* ================================
+   Equal height columns & cards
+   ================================ */
+
+div[data-testid="stColumns"] {
+  align-items: stretch;
+}
+
+div[data-testid="stColumns"] > div {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cards stretch to column height */
+.dashboard-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Live map expands */
+.live-map {
+  flex: 1 1 auto;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pydeck canvas fills space */
+.live-map iframe,
+.live-map canvas {
+  flex: 1 1 auto;
+}
+
+
+/* Card surface — white panels with subtle shadow and padding */
+.dashboard-card{
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255,255,255,0.03);
+  color: #e6eef8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: stretch;
+}
+
+/* Header area for the dashboard */
+.dashboard-header{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom: 12px;
+  padding: 10px 0; /* increased header padding for taller header */
+}
+.dashboard-header .title{
+  font-size:26px; /* larger title */
+  line-height:1.05;
+  font-weight:900;
+  color: var(--accent);
+}
+.dashboard-header .subtitle{
+  font-size:14px;
+  color: var(--muted);
+}
+
+/* Metrics row: compact, aligned, and pleasant */
+.metrics-row{ padding:10px; }
+.metrics-row .stMetric{ background:transparent; border:none; }
+.metrics-row [data-testid="stMetricValue"]{ color: var(--accent); font-weight:800; font-size:22px; }
+.metrics-row [data-testid="stMetricLabel"]{ color:var(--muted); font-size:12px; }
+
+/* Ensure cards stretch to align height-wise in columns */
+.stAppContainer, .main > div { /* reserved for potential future tweaks; intentionally non-destructive */ }
+.dashboard-card{ min-height: 56px; }
+
+/* Make the map visually prominent and taller so metrics align nicely */
+.live-map{ min-height: 560px; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+.live-map .stPydeckChart, .live-map .stMap, .live-map .deckgl-container{ border-radius: 8px; overflow:hidden; }
+
+/* Ensure pydeck / Streamlit map containers expand to fill the .live-map card */
+.live-map > div, .live-map > section, .live-map .stPydeckChart, .live-map .stMap, .live-map iframe, .live-map canvas, .live-map .deckgl-container {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+/* For some Streamlit versions the pydeck chart sits inside an extra wrapper — target nested wrappers too */
+.live-map div > .stPydeckChart, .live-map div > .stMap, .live-map section > .stPydeckChart { flex:1 1 auto !important; height:100% !important; }
+
+/* Alerts list gets a reasonable height to match map column visuals */
+.alerts-list{ min-height: 260px; }
+
+/* Small helpers for status badges (used in the Python-rendered badge) */
+.status-badge{
+  display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; font-weight:700; font-size:12px;
+}
+.status-badge.critical{ background: rgba(220,38,38,0.14); color: #fff; }
+.status-badge.warning{ background: rgba(245,158,11,0.12); color: #1f1b0d; }
+.status-badge.on_time{ background: rgba(52,211,153,0.10); color: #042617; }
+
+/* Fade-in reveal classes (applied by JS) */
+.fade-on-load{ opacity: 0; transform: translateY(8px); transition: opacity .36s ease, transform .36s cubic-bezier(.2,.9,.2,1); }
+.fade-on-load.is-visible{ opacity: 1; transform: translateY(0); }
+
+/* Small numeric flash for changed metric values */
+.num-flash{ animation: numFlash .9s ease; }
+@keyframes numFlash{ 0% { background: rgba(96,165,250,0.14); } 60% { background: transparent; } 100% { background: transparent; } }
+
+/* Minimal badge in the lower-right describing the demo source */
+.made-with{ position: fixed; right: 14px; bottom: 14px; background: rgba(255,255,255,0.03); color:#cfe3ff; padding:8px 12px; border-radius:999px; box-shadow: 0 10px 30px rgba(2,6,23,0.6); font-size:12px; z-index:9999; }
+
+/* Responsive tweaks: slightly smaller map height on narrow screens */
+@media (max-width: 900px){
+  .live-map{ min-height: 420px; }
+}
+
+/* Keep streamlit-built table spacing comfortable inside cards */
+.dashboard-card .stDataFrame, .dashboard-card .stTable{ margin-top:8px; }
+
+/* Small accessibility improvement for focus outlines on interactive elements inside cards */
+.dashboard-card a:focus, .dashboard-card button:focus{ outline: 3px solid rgba(96,165,250,0.12); outline-offset:2px; }
+
+/* End of stylesheet */
+
+/* -------------------------
+   Alignment helpers (conservative)
+   - Force top-alignment for common Streamlit column wrappers
+   - Give non-map cards a matching min-height so columns visually align
+   These rules are intentionally conservative and responsive.
+   ------------------------- */
+
+/* Best-effort selectors covering Streamlit column patterns */
+[data-testid="stColumns"] > div,
+.stColumns > div,
+.stCols > div,
+.streamlit-container > div > div > div > div > div {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+}
+
+/* Make non-map cards flexible: JS will compute and apply matching heights per-row.
+   We set a sensible zero baseline so CSS won't force fixed heights. */
+.dashboard-card:not(.live-map){
+  min-height: 0; /* allow JS to set comfortable heights */
+}
+
+@media (max-width: 1200px){
+  .dashboard-card:not(.live-map){ min-height: 0; }
+}
+
+@media (max-width: 900px){
+  /* on small screens don't force matching heights; let flow be natural */
+  .dashboard-card:not(.live-map){ min-height: 0; }
+  .live-map{ min-height: 420px; }
+}
+
+/* Keep explicit stretch for cards inside columns */
+.stColumns .dashboard-card, [data-testid="stColumns"] .dashboard-card { align-self: stretch; }
