@@ -7,6 +7,7 @@ import { ShipmentsPage } from './pages/ShipmentsPage';
 import { MapPage } from './pages/MapPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { VehicleHealthPage } from './pages/VehicleHealthPage';
 import { useSocket } from './hooks/useSocket';
 
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ function AppInner() {
         <Route path="/map" element={<MapPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/vehicle-health" element={<VehicleHealthPage />} />
       </Routes>
     </Layout>
   );

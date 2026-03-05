@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: supply_chain_db
       POSTGRES_USER: supply_chain_user
       POSTGRES_PASSWORD: supply_chain_pass
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
@@ -149,6 +150,23 @@ services:
       - ./backend:/app
       - ./shared:/app/shared
     command: python driver_safety.py
+    networks:
+      - supply-chain-network
+    restart: unless-stopped
+  vehicle-health-monitor:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vehicle_health_monitor
+    environment:
+      DATABASE_URL: postgresql://supply_chain_user:supply_chain_pass@postgres:5432/supply_chain_db
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: python vehicle_health_simulator.py
     networks:
       - supply-chain-network
     restart: unless-stopped

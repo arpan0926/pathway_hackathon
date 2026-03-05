@@ -7,9 +7,9 @@ import { motion } from 'framer-motion';
 
 const VEHICLE_DRIVERS: Record<string, string> = {
   VH001: 'Rajesh Kumar',
-  VH002: 'Priya Singh',
+  VH002: 'Hariram Singh',
   VH003: 'Amit Patel',
-  VH004: 'Sneha Sharma',
+  VH004: 'Ramkishan Sharma',
 };
 
 export const DriverSafetyMonitor = () => {

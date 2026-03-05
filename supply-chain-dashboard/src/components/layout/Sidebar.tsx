@@ -5,6 +5,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import MapIcon from '@mui/icons-material/Map';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import BuildIcon from '@mui/icons-material/Build';
 import { useStore } from '../../store/useStore';
 
 const NAV = [
@@ -13,6 +14,8 @@ const NAV = [
   { to: '/map',        icon: <MapIcon fontSize="small" />,           label: 'Live Map'   },
   { to: '/alerts',     icon: <NotificationsIcon fontSize="small" />, label: 'Alerts'     },
   { to: '/analytics',  icon: <BarChartIcon fontSize="small" />,      label: 'Analytics'  },
+  { to: '/vehicle-health', icon: <BuildIcon fontSize="small" />,     label: 'Vehicle Health' },
+  
 ];
 
 export const Sidebar = () => {

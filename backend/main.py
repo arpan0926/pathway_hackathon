@@ -380,6 +380,130 @@ def get_statistics():
         "total_telemetry_records": total_telemetry,
         "timestamp": datetime.now().isoformat()
     }
+@app.get("/api/vehicle-health/latest")
+def get_latest_vehicle_health():
+    """Get latest health data for all vehicles"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT DISTINCT ON (vehicle_id)
+            vehicle_id,
+            overall_health_score,
+            engine_health_score,
+            brake_health_score,
+            tire_health_score,
+            battery_health_score,
+            engine_temp_celsius,
+            brake_pad_thickness_mm,
+            tire_pressure_psi,
+            battery_voltage,
+            predicted_failure_type,
+            predicted_failure_days,
+            maintenance_urgency,
+            ts
+        FROM vehicle_health
+        ORDER BY vehicle_id, ts DESC
+    """)
+    
+    rows = cur.fetchall()
+    conn.close()
+    
+    return [
+        {
+            "vehicle_id": row[0],
+            "overall_health_score": float(row[1]) if row[1] else 0,
+            "engine_health_score": float(row[2]) if row[2] else 0,
+            "brake_health_score": float(row[3]) if row[3] else 0,
+            "tire_health_score": float(row[4]) if row[4] else 0,
+            "battery_health_score": float(row[5]) if row[5] else 0,
+            "engine_temp_celsius": float(row[6]) if row[6] else 0,
+            "brake_pad_thickness_mm": float(row[7]) if row[7] else 0,
+            "tire_pressure_psi": float(row[8]) if row[8] else 0,
+            "battery_voltage": float(row[9]) if row[9] else 0,
+            "predicted_failure_type": row[10],
+            "predicted_failure_days": row[11],
+            "maintenance_urgency": row[12] or "low",
+            "ts": row[13].isoformat() if row[13] else None,
+        }
+        for row in rows
+    ]
+
+
+@app.get("/api/maintenance-alerts")
+def get_maintenance_alerts():
+    """Get active maintenance alerts"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT 
+            alert_id, vehicle_id, alert_type, component, severity,
+            predicted_failure_date, recommendation, created_at
+        FROM maintenance_alerts
+        WHERE is_active = true
+        ORDER BY severity DESC, created_at DESC
+    """)
+    
+    rows = cur.fetchall()
+    conn.close()
+    
+    return [
+        {
+            "alert_id": row[0],
+            "vehicle_id": row[1],
+            "alert_type": row[2],
+            "component": row[3],
+            "severity": row[4],
+            "predicted_failure_date": row[5].isoformat() if row[5] else None,
+            "recommendation": row[6],
+            "created_at": row[7].isoformat() if row[7] else None,
+        }
+        for row in rows
+    ]
+@app.get("/api/vehicle-health/history/{vehicle_id}")
+def get_vehicle_health_history(vehicle_id: str, limit: int = 20):
+    """Get historical health data for a specific vehicle"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT 
+            ts,
+            overall_health_score,
+            engine_health_score,
+            brake_health_score,
+            tire_health_score,
+            battery_health_score,
+            engine_temp_celsius,
+            oil_pressure_psi,
+            brake_pad_thickness_mm
+        FROM vehicle_health
+        WHERE vehicle_id = %s
+        ORDER BY ts DESC
+        LIMIT %s
+    """, (vehicle_id, limit))
+    
+    rows = cur.fetchall()
+    conn.close()
+    
+    # Reverse to get chronological order
+    rows = list(reversed(rows))
+    
+    return [
+        {
+            "ts": row[0].isoformat() if row[0] else None,
+            "overall_health_score": float(row[1]) if row[1] else 0,
+            "engine_health_score": float(row[2]) if row[2] else 0,
+            "brake_health_score": float(row[3]) if row[3] else 0,
+            "tire_health_score": float(row[4]) if row[4] else 0,
+            "battery_health_score": float(row[5]) if row[5] else 0,
+            "engine_temp_celsius": float(row[6]) if row[6] else 0,
+            "oil_pressure_psi": float(row[7]) if row[7] else 0,
+            "brake_pad_thickness_mm": float(row[8]) if row[8] else 0,
+        }
+        for row in rows
+    ]
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     """Main chat endpoint"""

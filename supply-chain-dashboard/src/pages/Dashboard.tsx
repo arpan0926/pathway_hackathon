@@ -6,6 +6,7 @@ import { SpeedChart } from '../components/dashboard/SpeedChart';
 import { ETAChart } from '../components/dashboard/ETAChart';
 import { DriverSafetyMonitor } from '../components/dashboard/DriverSafetyMonitor';  // ← ADD THIS
 import { AIAlertsPanel } from '../components/dashboard/aiAlertsPanel';  // ← ADD THIS
+import { VehicleHealthMonitor } from '../components/dashboard/VehicleHealthMonitor';
 
 export const Dashboard = () => {
   const { data: stats } = useStats();
@@ -65,7 +66,7 @@ export const Dashboard = () => {
           </Grid>
         </Grid>
       </Grid>
-
+      
       {/* ETA Chart row */}
       <Grid container spacing={2}>
         <Grid size={{ xs: 12 }}>
