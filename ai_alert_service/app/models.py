@@ -15,3 +15,9 @@ class DriverSafetyReport(BaseModel):
     confidence: Optional[float] = None
     details: Optional[str] = None
     ts: Optional[datetime] = None
+    
+class OverspeedCheckRequest(BaseModel):
+    shipment_id: Optional[str] = None
+    speed_limit_kmph: Optional[float] = 80.0  # Default speed limit
+    duration_minutes: Optional[int] = 10  # Look back window
+    min_violations: Optional[int] = 5  # Min violations to trigger alert

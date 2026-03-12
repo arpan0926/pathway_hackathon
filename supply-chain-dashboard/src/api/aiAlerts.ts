@@ -26,6 +26,20 @@ export interface DriverSafetyReport {
   details?: string;
 }
 
+export interface OverspeedCheckRequest {
+  shipment_id?: string;
+  speed_limit_kmph?: number;
+  duration_minutes?: number;
+  min_violations?: number;
+}
+
+export interface OverspeedCheckResponse {
+  created_alerts: Array<{
+    shipment_id: string;
+    reason: string;
+  }>;
+}
+
 export const aiAlertsApi = {
   // Check database health
   healthCheck: () => 
@@ -34,6 +48,10 @@ export const aiAlertsApi = {
   // Check for stalled shipments
   checkStall: (request: StallCheckRequest) =>
     aiAlertsClient.post<StallCheckResponse>('/alerts/check-stall', request),
+
+  // Check for overspeed violations
+  checkOverspeed: (request: OverspeedCheckRequest) =>
+    aiAlertsClient.post<OverspeedCheckResponse>('/alerts/check-overspeed', request),
 
   // Report driver safety issue
   reportDriverSafety: (report: DriverSafetyReport) =>
