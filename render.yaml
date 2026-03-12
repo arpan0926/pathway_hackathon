@@ -1,0 +1,78 @@
+databases:
+  # PostgreSQL Database (Render Managed)
+  - name: supply-chain-db
+    databaseName: supply_chain_db
+    user: supply_chain_user
+    plan: free
+
+services:
+  # Backend API
+  - type: web
+    name: backend-api
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: supply-chain-db
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+    healthCheckPath: /health
+
+  # GPS Simulator
+  - type: worker
+    name: gps-simulator
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: python gps_simulator.py
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: supply-chain-db
+          property: connectionString
+
+  # Pathway Pipeline
+  - type: worker
+    name: pathway-pipeline
+    env: docker
+    dockerfilePath: ./pathway_pipeline/Dockerfile
+    dockerContext: ./pathway_pipeline
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: supply-chain-db
+          property: connectionString
+
+  # RAG Chatbot
+  - type: web
+    name: chatbot
+    env: docker
+    dockerfilePath: ./genai_rag/Dockerfile
+    dockerContext: ./genai_rag
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: supply-chain-db
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+
+  # AI Alert Service
+  - type: web
+    name: ai-alert-service
+    env: docker
+    dockerfilePath: ./ai_alert_service/dockerfile
+    dockerContext: ./ai_alert_service
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: supply-chain-db
+          property: connectionString
