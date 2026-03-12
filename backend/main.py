@@ -36,12 +36,19 @@ app = FastAPI(
 )
 
 # Enable CORS for dashboard
+# 1. Define origins allowed to make requests to your API
+origins = [
+    "http://localhost:3000",    # Common React/Vue dev port
+    "https://velocity-chain-git-main-arpan0926s-projects.vercel.app",  # Frontend deployed domain
+]
+
+# 2. Add the middleware to your app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=origins,      # Or ["*"] to allow all (not recommended for production)
+    allow_credentials=True,     # Allow cookies/auth headers
+    allow_methods=["*"],        # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],        # Allow all headers
 )
 socket_app = socketio.ASGIApp(sio, app)
 
