@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install backend requirements
+COPY backend/requirements.txt /app/backend_requirements.txt
+RUN pip install --no-cache-dir -r /app/backend_requirements.txt
+
+# Copy and install pathway requirements
+COPY pathway_pipeline/requirements.txt /app/pathway_requirements.txt
+RUN pip install --no-cache-dir -r /app/pathway_requirements.txt
+
+# Copy shared utilities
+COPY shared/ /app/shared/
+
+# Copy backend code
+COPY backend/gps_simulator.py /app/
+COPY backend/simulator.py /app/
+
+# Copy pathway pipeline code
+COPY pathway_pipeline/ /app/pathway_pipeline/
+
+# Create data directories
+RUN mkdir -p /app/data /app/outputs
+
+# Set Python to unbuffered mode
+ENV PYTHONUNBUFFERED=1
+
+# Run both services
+CMD python gps_simulator.py & \
+    cd pathway_pipeline && python postgres_to_csv_bridge.py & \
+    cd pathway_pipeline && python pipeline.py & \
+    wait
